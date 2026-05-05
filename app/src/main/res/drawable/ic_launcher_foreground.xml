@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Inima (Culoare TextPrimary #F5DDE0 pentru contrast optim pe fundalul burgundy) -->
+    <path
+        android:fillColor="#F5DDE0"
+        android:pathData="M54,90.35l-5.45,-4.32C28.4,64.36 17,51.28 17,31.5 17,19.42 26.42,10 38.5,10c6.74,0 13.41,3.81 15.5,8.09C56.09,13.81 62.76,10 69.5,10 81.58,10 91,19.42 91,31.5c0,19.78 -11.4,32.86 -31.55,54.54L54,90.35z" />
+
+    <!-- Semnal EKG (BurgundyPrimary #BC0039) -->
+    <path
+        android:strokeColor="#BC0039"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M30,35 L43,35 L47,15 L51,55 L55,35 L65,35 L68,25 L72,45 L75,35 L80,35" />
+
+    <!-- Amprente (BurgundyPrimary #BC0039 - Linii curbe în partea de jos a inimii) -->
+    <path
+        android:strokeColor="#BC0039"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M45,55 C48,58 54,62 63,55" />
+    <path
+        android:strokeColor="#BC0039"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M40,62 C45,67 54,72 68,62" />
+    <path
+        android:strokeColor="#BC0039"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M35,69 C42,76 54,82 73,69" />
+    <path
+        android:strokeColor="#BC0039"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,48 C58,48 62,52 62,57" />
+
+</vector>

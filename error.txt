@@ -1,0 +1,4 @@
+Authentication with Apple Developer Portal failed!
+You have no team associated with your Apple account, cannot proceed.
+(Do you have a paid Apple Developer account?)
+    Error:

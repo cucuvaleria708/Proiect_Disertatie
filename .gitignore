@@ -1,0 +1,25 @@
+# Build outputs
+build/
+app/build/
+.gradle/
+.kotlin/
+
+# Local config
+local.properties
+*.local.properties
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Keys & secrets
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+
+# OS
+.DS_Store
+Thumbs.db

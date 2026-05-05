@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vital Signs</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_history">Istoric</string>
+    <string name="nav_settings">Setări</string>
+    <string name="connection">Conexiune</string>
+    <string name="ecg_detail">ECG Detaliat</string>
+    <string name="disconnected">Deconectat</string>
+    <string name="connected">Conectat</string>
+    <string name="connecting">Se conectează...</string>
+    <string name="scanning">Scanare...</string>
+    <string name="bpm_label">BPM</string>
+    <string name="wifi">WiFi</string>
+    <string name="bluetooth">Bluetooth</string>
+</resources>

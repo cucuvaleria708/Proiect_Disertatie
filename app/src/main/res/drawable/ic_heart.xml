@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <group
+        android:translateX="21.6"
+        android:translateY="21.6"
+        android:scaleX="0.6"
+        android:scaleY="0.6">
+        
+        <!-- Inima Albastru Medical (Revenit la original) -->
+        <path
+            android:fillColor="@color/medical_teal"
+            android:pathData="M54,90.35l-5.45,-4.32C28.4,64.36 17,51.28 17,31.5 17,19.42 26.42,10 38.5,10c6.74,0 13.41,3.81 15.5,8.09C56.09,13.81 62.76,10 69.5,10 81.58,10 91,19.42 91,31.5c0,19.78 -11.4,32.86 -31.55,54.54L54,90.35z" />
+            
+        <!-- Linie EKG Albă (Simbol Medical) -->
+        <path
+            android:strokeColor="@color/white"
+            android:strokeWidth="3.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M30,45 L42,45 L46,25 L50,65 L54,45 L64,45 L67,35 L71,55 L74,45 L80,45" />
+            
+    </group>
+</vector>

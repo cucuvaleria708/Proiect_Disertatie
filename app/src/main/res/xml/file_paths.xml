@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Folder cache pentru pozele ECG facute cu camera -->
+    <cache-path name="ecg_photos" path="ecg_images/" />
+    <!-- Folder Documents pentru PDF-urile exportate -->
+    <external-files-path name="documents" path="Documents/" />
+    <!-- Fallback: fisiere interne ale aplicatiei -->
+    <files-path name="internal_files" path="." />
+</paths>
