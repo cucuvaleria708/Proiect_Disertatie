@@ -33,6 +33,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.alex.monitorsanatate.ui.components.BpmGauge
 import com.alex.monitorsanatate.ui.settings.bpmHighThreshold
 import com.alex.monitorsanatate.ui.settings.bpmLowThreshold
 import com.alex.monitorsanatate.ui.theme.*
@@ -103,16 +104,6 @@ fun CameraPulseContent(onNavigateBack: () -> Unit) {
     var measurementStartTime by remember { mutableStateOf(0L) }
 
     val measuredBpms = remember { mutableStateListOf<Int>() }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val heartScale by infiniteTransition.animateFloat(
-        initialValue  = 1f,
-        targetValue   = if (isFingerDetected && bpm > 0) 1.22f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(if (bpm > 40) 30000 / bpm else 400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ), label = "scale"
-    )
 
     val analyzer = remember {
         HeartRateAnalyzer { detectedBpm, fingerPresent, calibrating ->
@@ -359,7 +350,7 @@ fun CameraPulseContent(onNavigateBack: () -> Unit) {
 
             Spacer(Modifier.height(14.dp))
 
-            // ── Card BPM (ascuns după finalizare) ─────────────────────────────
+            // ── Card BPM cu BpmGauge (ascuns după finalizare) ─────────────────
             if (status != "finalizat") {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -367,31 +358,15 @@ fun CameraPulseContent(onNavigateBack: () -> Unit) {
                     colors   = CardDefaults.cardColors(containerColor = AppSurfaceHigh)
                 ) {
                     Column(
-                        modifier            = Modifier.padding(24.dp),
+                        modifier            = Modifier.fillMaxWidth().padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Favorite,
-                            contentDescription = null,
-                            tint     = PulseRedMain,
-                            modifier = Modifier.size(52.dp).scale(heartScale)
-                        )
-                        Spacer(Modifier.height(10.dp))
-
                         val displayBpm = if (isFingerDetected && bpm > 0) bpm else 0
-                        Text(
-                            if (displayBpm > 0) "$displayBpm" else "--",
-                            fontSize   = 80.sp,
-                            fontWeight = FontWeight.Black,
-                            color      = Ral5018Main,
-                            lineHeight = 80.sp
-                        )
-                        Text(
-                            "BPM",
-                            fontSize      = 16.sp,
-                            fontWeight    = FontWeight.SemiBold,
-                            color         = TextSecondary,
-                            letterSpacing = 3.sp
+
+                        BpmGauge(
+                            bpm         = displayBpm,
+                            isConnected = isFingerDetected,
+                            size        = 200.dp
                         )
 
                         when {

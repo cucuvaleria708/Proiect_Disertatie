@@ -19,16 +19,17 @@ import org.pytorch.Module
 import org.pytorch.torchvision.TensorImageUtils
 import javax.inject.Inject
 import kotlin.math.exp
+import com.alex.monitorsanatate.di.EcgSnapshotHolder
 import com.alex.monitorsanatate.domain.model.ConnectionMethod
 import com.alex.monitorsanatate.domain.model.Measurement
 import com.alex.monitorsanatate.domain.usecase.SaveMeasurementUseCase
 
 // ── Clase ECG ────────────────────────────────────────────────────────────────
 val ECG_CLASSES = listOf(
-    EcgClass(0, "Infarct miocardic", "Semne ECG compatibile cu infarct miocardic acut.",         0xFF9B2226),
-    EcgClass(1, "Istoric infarct",   "Modificari ECG sugestive pentru infarct miocardic vechi.", 0xFFCA6702),
-    EcgClass(2, "Bătaie anormală",   "Aritmie sau anomalie de conducere detectată.",             0xFFBC6C25),
-    EcgClass(3, "Normal",            "Ritm cardiac normal, fără anomalii detectate.",            0xFF2D6A4F),
+    EcgClass(0, "Infarct miocardic acut",          "Semne ECG compatibile cu infarct miocardic acut.",              0xFF9B2226),
+    EcgClass(1, "Infarct miocardic în antecedente","Modificări ECG sugestive pentru infarct miocardic în antecedente.", 0xFFCA6702),
+    EcgClass(2, "Ritm cardiac anormal",            "Aritmie sau anomalie de conducere detectată.",                  0xFFBC6C25),
+    EcgClass(3, "Ritm cardiac normal",             "Ritm cardiac normal, fără anomalii detectate.",                 0xFF2D6A4F),
 )
 
 data class EcgClass(
@@ -52,11 +53,25 @@ sealed class AnalysisUiState {
 @HiltViewModel
 class EcgAnalysisViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val saveMeasurementUseCase: SaveMeasurementUseCase
+    private val saveMeasurementUseCase: SaveMeasurementUseCase,
+    private val ecgSnapshotHolder: EcgSnapshotHolder
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AnalysisUiState>(AnalysisUiState.Idle)
     val uiState: StateFlow<AnalysisUiState> = _uiState
+
+    init {
+        // Daca DashboardScreen a capturat un traseu EKG, il incarcam si analizam automat
+        val snapshot = ecgSnapshotHolder.pendingBitmap
+        if (snapshot != null) {
+            ecgSnapshotHolder.pendingBitmap = null
+            _uiState.value = AnalysisUiState.Result(
+                predictedIndex = -1,
+                probabilities  = emptyList(),
+                bitmap         = snapshot
+            )
+        }
+    }
 
     private var module: Module? = null
 

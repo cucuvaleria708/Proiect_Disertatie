@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alex.monitorsanatate.domain.model.ConnectionState
+import com.alex.monitorsanatate.ui.components.BpmGauge
 import com.alex.monitorsanatate.ui.dashboard.NotConnectedCard
 import com.alex.monitorsanatate.ui.theme.*
 
@@ -94,16 +95,6 @@ fun SensorPulseMonitorScreen(onNavigateBack: () -> Unit) {
             }
         }
     }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val heartScale by infiniteTransition.animateFloat(
-        initialValue  = 1f,
-        targetValue   = if (currentBpm > 40 && status == "masurare") 1.15f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(if (currentBpm > 40) 30000 / currentBpm else 700, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ), label = "scale"
-    )
 
     Box(modifier = Modifier.fillMaxSize().background(AppBackground)) {
         Column(
@@ -200,7 +191,6 @@ fun SensorPulseMonitorScreen(onNavigateBack: () -> Unit) {
                             status        = status,
                             timeRemaining = timeRemaining,
                             semnalValid   = semnalValid,
-                            heartScale    = heartScale,
                             userAge       = userAge,
                             userGender    = userGender,
                             userWeight    = userWeight,
@@ -259,79 +249,90 @@ private fun PulsTab(
     status: String,
     timeRemaining: Int,
     semnalValid: Boolean,
-    heartScale: Float,
     userAge: Int,
     userGender: String,
     userWeight: Float,
     onStart: () -> Unit
 ) {
-    // Card BPM hero
+    // Card BPM hero cu BpmGauge (semiluna)
     Card(
         modifier  = Modifier.fillMaxWidth(),
         shape     = RoundedCornerShape(28.dp),
         colors    = CardDefaults.cardColors(containerColor = AppSurfaceHigh),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Box(modifier = Modifier.fillMaxWidth().padding(28.dp),
-            contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector        = Icons.Filled.Favorite,
-                    contentDescription = null,
-                    tint               = PulseRedMain,
-                    modifier           = Modifier.size(64.dp).scale(heartScale)
-                )
-                Spacer(Modifier.height(8.dp))
-                when (status) {
-                    "masurare" -> {
-                        Text("$currentBpm", fontSize = 88.sp, fontWeight = FontWeight.Black,
-                            color = Ral5018Main, lineHeight = 88.sp)
-                        Text("BPM", fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
-                            color = TextSecondary, letterSpacing = 3.sp)
-                        Spacer(Modifier.height(20.dp))
-                        Text("Măsurare în curs • ${timeRemaining}s",
-                            fontSize = 14.sp, color = Ral5018Light, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.height(10.dp))
-                        LinearProgressIndicator(
-                            progress   = { (15 - timeRemaining) / 15f },
-                            modifier   = Modifier.fillMaxWidth().height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
+        Column(
+            modifier            = Modifier.fillMaxWidth().padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            val gaugeBpm = when (status) {
+                "finalizat" -> finalBpm
+                "masurare"  -> currentBpm
+                else        -> if (currentBpm > 40) currentBpm else 0
+            }
+            val gaugeConnected = when (status) {
+                "finalizat" -> finalBpm > 0
+                "masurare"  -> true
+                else        -> currentBpm > 40
+            }
+
+            BpmGauge(
+                bpm         = gaugeBpm,
+                isConnected = gaugeConnected,
+                size        = 200.dp
+            )
+
+            when (status) {
+                "masurare" -> {
+                    Spacer(Modifier.height(20.dp))
+                    Text(
+                        "Măsurare în curs • ${timeRemaining}s",
+                        fontSize   = 14.sp,
+                        color      = Ral5018Light,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    LinearProgressIndicator(
+                        progress   = { (15 - timeRemaining) / 15f },
+                        modifier   = Modifier.fillMaxWidth().height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color      = Ral5018Main,
+                        trackColor = AppSurfaceOverlay
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text("Nu mișca degetul", fontSize = 12.sp, color = TextSecondary)
+                }
+                "finalizat" -> {
+                    Spacer(Modifier.height(14.dp))
+                    Surface(shape = RoundedCornerShape(20.dp), color = AppSurface) {
+                        Text(
+                            "✓ Măsurare finalizată",
+                            fontSize   = 14.sp,
                             color      = Ral5018Main,
-                            trackColor = AppSurfaceOverlay
+                            fontWeight = FontWeight.SemiBold,
+                            modifier   = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                         )
-                        Spacer(Modifier.height(6.dp))
-                        Text("Nu mișca degetul", fontSize = 12.sp, color = TextSecondary)
                     }
-                    "finalizat" -> {
-                        Text("$finalBpm", fontSize = 88.sp, fontWeight = FontWeight.Black,
-                            color = Ral5018Main, lineHeight = 88.sp)
-                        Text("BPM", fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
-                            color = TextSecondary, letterSpacing = 3.sp)
-                        Spacer(Modifier.height(12.dp))
-                        Surface(shape = RoundedCornerShape(20.dp), color = AppSurface) {
-                            Text("✓ Măsurare finalizată", fontSize = 14.sp,
-                                color = Ral5018Main, fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
-                        }
+                    Spacer(Modifier.height(8.dp))
+                    Surface(shape = RoundedCornerShape(20.dp), color = AppSurface) {
+                        Text(
+                            bpmCategory(finalBpm),
+                            fontSize   = 13.sp,
+                            color      = TextSecondary,
+                            fontWeight = FontWeight.Medium,
+                            modifier   = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+                else -> {
+                    if (currentBpm <= 40) {
                         Spacer(Modifier.height(8.dp))
-                        Surface(shape = RoundedCornerShape(20.dp), color = AppSurface) {
-                            Text(bpmCategory(finalBpm), fontSize = 13.sp,
-                                color = TextSecondary, fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp))
-                        }
-                    }
-                    else -> {
-                        if (currentBpm > 40) {
-                            Text("$currentBpm", fontSize = 88.sp, fontWeight = FontWeight.Black,
-                                color = TextSecondary, lineHeight = 88.sp)
-                            Text("BPM  previzualizare", fontSize = 13.sp,
-                                color = TextDisabled, letterSpacing = 2.sp)
-                        } else {
-                            Text("--", fontSize = 88.sp, fontWeight = FontWeight.Black,
-                                color = TextDisabled, lineHeight = 88.sp)
-                            Text("Plasează degetul pe senzor", fontSize = 13.sp,
-                                color = TextSecondary, textAlign = TextAlign.Center)
-                        }
+                        Text(
+                            "Plasează degetul pe senzor",
+                            fontSize  = 13.sp,
+                            color     = TextSecondary,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             }

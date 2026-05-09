@@ -208,8 +208,14 @@ fun NavGraph(
             // ── Tab 2: ECG Live ───────────────────────────────────────────
             composable(Screen.Dashboard.route) {
                 DashboardScreen(
-                    onNavigateToConnection = { navController.navigate(Screen.Connection.route) },
-                    onNavigateToEcgDetail  = { navController.navigate(Screen.EcgDetail.route) }
+                    onNavigateToConnection  = { navController.navigate(Screen.Connection.route) },
+                    onNavigateToEcgDetail   = { navController.navigate(Screen.EcgDetail.route) },
+                    onNavigateToEcgAnalysis = {
+                        navController.navigate(Screen.EcgAnalysis.route) {
+                            launchSingleTop = true
+                            restoreState    = false
+                        }
+                    }
                 )
             }
 
