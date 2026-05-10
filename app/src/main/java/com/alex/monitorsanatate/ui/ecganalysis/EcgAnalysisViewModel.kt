@@ -61,7 +61,7 @@ class EcgAnalysisViewModel @Inject constructor(
     val uiState: StateFlow<AnalysisUiState> = _uiState
 
     init {
-        // Daca DashboardScreen a capturat un traseu EKG, il incarcam si analizam automat
+        // Daca DashboardScreen a capturat un traseu ECG, il incarcam si analizam automat
         val snapshot = ecgSnapshotHolder.pendingBitmap
         if (snapshot != null) {
             ecgSnapshotHolder.pendingBitmap = null

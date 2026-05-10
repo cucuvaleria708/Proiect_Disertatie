@@ -63,7 +63,7 @@ fun EcgDetailScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(AppBackground)) {
         TopAppBar(
-            title = { Text("Verificare EKG") },
+            title = { Text("Verificare ECG") },
             navigationIcon = {
                 IconButton(onClick = onNavigateBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Înapoi")
@@ -173,7 +173,7 @@ fun EcgDetailScreen(
                 ) {
                     Text(
                         text = if (isConnected)
-                            "Plasează degetul pe senzor\npentru a vizualiza EKG-ul"
+                            "Plasează degetul pe senzor\npentru a vizualiza ECG-ul"
                         else
                             "Senzorul nu este conectat\nMergi la Setări → Conexiune senzor puls",
                         style = MaterialTheme.typography.bodyLarge,

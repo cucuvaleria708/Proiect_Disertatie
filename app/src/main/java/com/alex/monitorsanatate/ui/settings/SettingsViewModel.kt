@@ -3,7 +3,6 @@ package com.alex.monitorsanatate.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alex.monitorsanatate.data.local.datastore.SettingsDataStore
-import com.alex.monitorsanatate.data.remote.ble.BleConnectionManager
 import com.alex.monitorsanatate.data.repository.AuthRepository
 import com.alex.monitorsanatate.data.repository.MedicalProfileRepository
 import com.alex.monitorsanatate.domain.model.ConnectionMethod
@@ -26,7 +25,6 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val settingsDataStore: SettingsDataStore,
     private val authRepository: AuthRepository,
-    private val bleConnectionManager: BleConnectionManager,
     private val connectionRepository: ConnectionRepository,
     private val medicalProfileRepository: MedicalProfileRepository
 ) : ViewModel() {
@@ -87,23 +85,14 @@ class SettingsViewModel @Inject constructor(
     fun setAge(age: Int)          = saveProfile(userGender.value, age, userWeight.value)
     fun setWeight(weight: Float)  = saveProfile(userGender.value, userAge.value, weight)
 
-    // ── Conexiune senzor Puls (BLE direct) ───────────────────────────────────
-    val pulseConnectionState: StateFlow<ConnectionState> = bleConnectionManager.connectionState
-    val pulseDevices: StateFlow<List<DeviceInfo>>        = bleConnectionManager.discoveredDevices
+    // ── Conexiune modul ESP32 (BLE via ConnectionRepository) ─────────────────
+    val esp32ConnectionState: StateFlow<ConnectionState> = connectionRepository.connectionState
+    val esp32Devices: StateFlow<List<DeviceInfo>>        = connectionRepository.discoveredDevices
 
-    fun startPulseScan()                       { viewModelScope.launch { bleConnectionManager.startScan() } }
-    fun stopPulseScan()                        { viewModelScope.launch { bleConnectionManager.stopScan() } }
-    fun connectPulseDevice(device: DeviceInfo) { viewModelScope.launch { bleConnectionManager.connect(device) } }
-    fun disconnectPulse()                      { viewModelScope.launch { bleConnectionManager.disconnect() } }
-
-    // ── Conexiune senzor EKG (BLE via ConnectionRepository) ──────────────────
-    val ekgConnectionState: StateFlow<ConnectionState> = connectionRepository.connectionState
-    val ekgDevices: StateFlow<List<DeviceInfo>>        = connectionRepository.discoveredDevices
-
-    fun startEkgScan()                        { viewModelScope.launch { connectionRepository.startScan(ConnectionMethod.BLE) } }
-    fun stopEkgScan()                         { viewModelScope.launch { connectionRepository.stopScan() } }
-    fun connectEkgDevice(device: DeviceInfo)  { viewModelScope.launch { connectionRepository.connect(device) } }
-    fun disconnectEkg()                       { viewModelScope.launch { connectionRepository.disconnect() } }
+    fun startScan()                        { viewModelScope.launch { connectionRepository.startScan(ConnectionMethod.BLE) } }
+    fun stopScan()                         { viewModelScope.launch { connectionRepository.stopScan() } }
+    fun connectDevice(device: DeviceInfo)  { viewModelScope.launch { connectionRepository.connect(device) } }
+    fun disconnect()                       { viewModelScope.launch { connectionRepository.disconnect() } }
 
     private val _logoutEvent = MutableSharedFlow<Unit>()
     val logoutEvent: SharedFlow<Unit> = _logoutEvent

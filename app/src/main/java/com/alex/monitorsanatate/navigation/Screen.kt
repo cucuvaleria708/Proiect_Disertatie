@@ -39,7 +39,7 @@ enum class BottomNavItem(
     val icon: ImageVector
 ) {
     PULSE(Screen.PulseMonitor, "Verificare Puls", Icons.Filled.Favorite),
-    LIVE(Screen.Dashboard,    "Verificare EKG",   Icons.Filled.GraphicEq),
+    LIVE(Screen.Dashboard,    "Verificare ECG",   Icons.Filled.GraphicEq),
     ANALYSIS(Screen.EcgAnalysis, "Analiză AI", Icons.Filled.ImageSearch),
     HISTORY(Screen.History,   "Jurnal",    Icons.Filled.History),
     SETTINGS(Screen.Settings, "Setări",     Icons.Filled.Settings),

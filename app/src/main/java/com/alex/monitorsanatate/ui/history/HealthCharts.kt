@@ -39,7 +39,7 @@ fun BpmTrendChart(
     val sorted = remember(measurements) {
         measurements.filter { it.averageBpm > 0 }.sortedBy { it.startTime }.takeLast(30)
     }
-    val lineColor = if (chartType == "EKG") Ral5018Main else PulseRedMain
+    val lineColor = if (chartType == "ECG") Ral5018Main else PulseRedMain
     val dateFmt   = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
     val textMeasurer = rememberTextMeasurer()
 
@@ -330,7 +330,7 @@ fun EcgWaveformChart(
                 )
             }
 
-            // ── Etichete standard EKG ─────────────────────────────────────────
+            // ── Etichete standard ECG ─────────────────────────────────────────
             Spacer(Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -367,7 +367,7 @@ fun ChartsSection(
             }
             else -> {
                 BpmTrendChart(measurements = measurements, chartType = currentFilter)
-                if (currentFilter == "EKG") {
+                if (currentFilter == "ECG") {
                     Spacer(Modifier.height(12.dp))
                     EcgWaveformChart(
                         ecgData = latestEcgData,

@@ -163,7 +163,7 @@ fun HistoryScreen(
     if (showDeleteAllDialog) {
         val labelFiltru = when (currentFilter) {
             "Puls" -> "Puls"
-            "EKG"  -> "EKG"
+            "ECG"  -> "ECG"
             "AI"   -> "AI ECG"
             else   -> "toate categoriile"
         }
@@ -204,7 +204,7 @@ fun HistoryScreen(
                 title = "Jurnal",
                 subtitle = "Înregistrările tale",
                 actions = {
-                    if (currentFilter == "Puls" || currentFilter == "EKG" || currentFilter == "AI") {
+                    if (currentFilter == "Puls" || currentFilter == "ECG" || currentFilter == "AI") {
                         IconButton(
                             onClick = { onNavigateToCharts(currentFilter) },
                             modifier = Modifier.padding(end = 4.dp)
@@ -213,7 +213,7 @@ fun HistoryScreen(
                                 Icons.Filled.Timeline,
                                 contentDescription = "Deschide grafice $currentFilter",
                                 tint = when (currentFilter) {
-                                    "EKG" -> Ral5018Light
+                                    "ECG" -> Ral5018Light
                                     "AI"  -> Color(0xFF6750A4)
                                     else  -> PulseRedMain
                                 },
@@ -224,7 +224,7 @@ fun HistoryScreen(
                 }
             )
 
-            // ── [Coș] [PDF]  [Toate] [Puls] [EKG] [AI] — o singură linie fixă ──
+            // ── [Coș] [PDF]  [Toate] [Puls] [ECG] [AI] — o singură linie fixă ──
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -259,7 +259,7 @@ fun HistoryScreen(
                 }
 
                 // 3–6. Chip-uri filtre — fiecare ocupa spatiu egal din ce ramane
-                listOf("Toate", "Puls", "EKG", "AI").forEach { filter ->
+                listOf("Toate", "Puls", "ECG", "AI").forEach { filter ->
                     val isSelected = currentFilter == filter
                     Surface(
                         modifier = Modifier
@@ -341,7 +341,7 @@ private fun MeasurementCard(
     val dateFmt = SimpleDateFormat("dd MMM yyyy  •  HH:mm", Locale.getDefault())
     val duration = (measurement.endTime - measurement.startTime) / 1000
     val bpm = measurement.averageBpm
-    val isEcg = measurement.measurementType == "EKG"
+    val isEcg = measurement.measurementType == "ECG" || measurement.measurementType == "EKG"
     val isAI  = measurement.measurementType == "AI_ECG"
 
     val (zoneLabel, zoneColor) = when {
@@ -454,7 +454,7 @@ private fun MeasurementCard(
                         }
                     ) {
                         Text(
-                            when { isAI -> "AI ECG"; isEcg -> "EKG"; else -> "Puls" },
+                            when { isAI -> "AI ECG"; isEcg -> "ECG"; else -> "Puls" },
                             fontSize = 10.sp,
                             color = when {
                                 isAI  -> Color(0xFF6750A4)
@@ -587,8 +587,8 @@ private fun generateMedicalPdf(
     val C_RED_BG      = 0xFFFFEBEE.toInt()
     val C_DKRED_TXT   = 0xFF4A0000.toInt()
     val C_DKRED_BG    = 0xFFFFCDD2.toInt()
-    val C_TEAL_TYP    = 0xFF004F4D.toInt()    // Text tip EKG
-    val C_TEAL_TYPBG  = 0xFFB2DFDF.toInt()    // BG tip EKG
+    val C_TEAL_TYP    = 0xFF004F4D.toInt()    // Text tip ECG
+    val C_TEAL_TYPBG  = 0xFFB2DFDF.toInt()    // BG tip ECG
 
     // ── Formatare date ────────────────────────────────────────────────────────
     val fmtDate = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
@@ -687,10 +687,10 @@ private fun generateMedicalPdf(
         txt(filterLabel,           rx + 65f, r1, 8.5f, C_TEAL_ACCENT, bold = true)
 
         txt("Total înregistrări:", rx, r2, 8.5f, C_TEXT_GREY)
-        val pulsCount = measurements.count { it.measurementType != "EKG" && it.measurementType != "AI_ECG" }
-        val ecgCount  = measurements.count { it.measurementType == "EKG" }
+        val pulsCount = measurements.count { it.measurementType != "ECG" && it.measurementType != "EKG" && it.measurementType != "AI_ECG" }
+        val ecgCount  = measurements.count { it.measurementType == "ECG" || it.measurementType == "EKG" }
         val aiCount   = measurements.count { it.measurementType == "AI_ECG" }
-        txt("${measurements.size}  (Puls: $pulsCount · EKG: $ecgCount · AI: $aiCount)", rx + 100f, r2, 8.5f, C_TEXT, bold = true)
+        txt("${measurements.size}  (Puls: $pulsCount · ECG: $ecgCount · AI: $aiCount)", rx + 100f, r2, 8.5f, C_TEXT, bold = true)
 
         // Separator orizontal ușor sub rândurile 1–2
         pStroke.color = C_BORDER; pStroke.strokeWidth = 0.35f
@@ -779,7 +779,7 @@ private fun generateMedicalPdf(
             ConnectionMethod.BLE     -> "Bluetooth"
         }
 
-        val isEcg = m.measurementType == "EKG"
+        val isEcg = m.measurementType == "ECG" || m.measurementType == "EKG"
         val isAI  = m.measurementType == "AI_ECG"
 
         // Nr. crt (bold, gri)
@@ -794,7 +794,7 @@ private fun generateMedicalPdf(
         // Tip — pastilă colorată
         val typeBg  = when { isAI -> 0xFFEDE7F6.toInt(); isEcg -> C_TEAL_TYPBG;  else -> 0xFFE3F2FD.toInt() }
         val typeTxt = when { isAI -> 0xFF4527A0.toInt(); isEcg -> C_TEAL_TYP;    else -> 0xFF0D47A1.toInt() }
-        val typeStr = when { isAI -> "AI ECG";            isEcg -> "EKG";          else -> "Puls" }
+        val typeStr = when { isAI -> "AI ECG";            isEcg -> "ECG";          else -> "Puls" }
         pFill.color = typeBg
         cv!!.drawRoundRect(RectF(xTip + 3f, y + 5f, xTip + 42f, y + H_ROW - 5f), 4f, 4f, pFill)
         txt(typeStr, xTip + 6f, tY, 7.5f, typeTxt, bold = true)

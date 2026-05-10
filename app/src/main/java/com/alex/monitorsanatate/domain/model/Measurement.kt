@@ -7,7 +7,7 @@ data class Measurement(
     val averageBpm: Int,
     val minBpm: Int,
     val maxBpm: Int,
-    val measurementType: String = "PULS",  // "PULS", "EKG", "AI_ECG"
+    val measurementType: String = "PULS",  // "PULS", "ECG", "AI_ECG"
     val ecgData: List<Float> = emptyList(),
     val connectionMethod: ConnectionMethod,
     val notes: String? = null,

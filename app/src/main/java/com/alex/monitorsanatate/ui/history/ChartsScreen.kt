@@ -25,7 +25,7 @@ import com.alex.monitorsanatate.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChartsScreen(
-    chartFilter: String,        // "Puls" sau "EKG"
+    chartFilter: String,        // "Puls" sau "ECG"
     onNavigateBack: () -> Unit,
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
@@ -37,7 +37,7 @@ fun ChartsScreen(
     val measurements   by viewModel.measurements.collectAsStateWithLifecycle()
     val latestEcgData  by viewModel.latestEcgData.collectAsStateWithLifecycle()
 
-    val isEkg   = chartFilter == "EKG"
+    val isEkg   = chartFilter == "ECG"
     val isAi    = chartFilter == "AI"
     val accentColor = when {
         isEkg -> Ral5018Main
@@ -118,7 +118,7 @@ fun ChartsScreen(
                 // ── Grafic BPM Tendință ───────────────────────────────────────
                 SectionHeader(
                     title    = "Tendință BPM în timp",
-                    subtitle = if (isEkg) "BPM mediu per sesiune EKG" else "BPM mediu per sesiune de puls"
+                    subtitle = if (isEkg) "BPM mediu per sesiune ECG" else "BPM mediu per sesiune de puls"
                 )
                 BpmTrendChart(
                     measurements = measurements,
@@ -150,12 +150,12 @@ fun ChartsScreen(
                     )
                 }
 
-                // ── Formă de undă EKG (doar pentru EKG) ──────────────────────
+                // ── Formă de undă ECG (doar pentru ECG) ──────────────────────
                 if (isEkg) {
                     val latestEkg = measurements.maxByOrNull { it.startTime }
                     SectionHeader(
                         title    = "Formă de undă ECG",
-                        subtitle = "Ultima înregistrare EKG salvată"
+                        subtitle = "Ultima înregistrare ECG salvată"
                     )
                     EcgWaveformChart(
                         ecgData       = latestEcgData,

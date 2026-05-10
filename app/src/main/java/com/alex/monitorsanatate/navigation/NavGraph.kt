@@ -236,7 +236,7 @@ fun NavGraph(
                 )
             }
 
-            // ── Grafice Puls / EKG ────────────────────────────────────────
+            // ── Grafice Puls / ECG ────────────────────────────────────────
             composable(
                 route = Screen.Charts.route,
                 arguments = listOf(navArgument("chartFilter") { type = NavType.StringType })

@@ -1,6 +1,7 @@
 package com.alex.monitorsanatate.ui.dashboard
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,7 +20,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -65,7 +73,7 @@ fun DashboardScreen(
         Column(modifier = Modifier.fillMaxSize()) {
 
             AppScreenHeader(
-                title    = "Verificare EKG",
+                title    = "Verificare ECG",
                 subtitle = "Monitorizare în timp real"
             )
 
@@ -85,8 +93,9 @@ fun DashboardScreen(
                             message = if (connectionState is ConnectionState.Error)
                                 (connectionState as ConnectionState.Error).message
                             else null,
-                            hint = "Conectați senzorul EKG urmând pașii: accesați Setări → Conexiune senzor EKG, asigurați-vă că placa de dezvoltare ESP32 este alimentată și inițiați scanarea Bluetooth."
+                            hint = "Conectați modulul ESP32 urmând pașii: accesați Setări → Conexiune modul ESP32, asigurați-vă că placa de dezvoltare ESP32 este alimentată și inițiați scanarea Bluetooth."
                         )
+                        ElectrodeGuideCard()
                     }
 
                     // ── Scanare / Conectare ───────────────────────────────────
@@ -99,7 +108,7 @@ fun DashboardScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 CircularProgressIndicator(color = Ral5018Main)
                                 Spacer(Modifier.height(12.dp))
-                                Text("Se caută senzorul EKG...",
+                                Text("Se caută modulul ESP32...",
                                     fontSize = 14.sp, color = TextSecondary)
                             }
                         }
@@ -149,7 +158,10 @@ fun DashboardScreen(
                             }
                         }
 
-                        // Card BPM — calculat din R-peaks ale semnalului EKG (AD8232)
+                        // Ghid plasare electrozi — mereu vizibil
+                        ElectrodeGuideCard()
+
+                        // Card BPM — calculat din R-peaks ale semnalului ECG (AD8232)
                         Card(
                             modifier  = Modifier.fillMaxWidth(),
                             shape     = RoundedCornerShape(28.dp),
@@ -168,7 +180,7 @@ fun DashboardScreen(
                                     )
                                     Spacer(Modifier.height(8.dp))
                                     Text(
-                                        "din semnal EKG",
+                                        "din semnal ECG",
                                         fontSize  = 11.sp,
                                         color     = TextSecondary,
                                         letterSpacing = 0.5.sp
@@ -187,7 +199,7 @@ fun DashboardScreen(
                             }
                         }
 
-                        // Card traseu EKG
+                        // Card traseu ECG
                         Card(
                             modifier  = Modifier
                                 .fillMaxWidth()
@@ -204,7 +216,7 @@ fun DashboardScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment     = Alignment.CenterVertically
                                 ) {
-                                    Text("Semnal EKG",
+                                    Text("Semnal ECG",
                                         style      = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color      = TextPrimary)
@@ -234,12 +246,12 @@ fun DashboardScreen(
                             onStart       = { viewModel.startMeasurement() }
                         )
 
-                        // Card metrici EKG
+                        // Card metrici ECG
                         if (ekgMetrics.rrIntervalMs > 0 || ekgMetrics.hrv > 0f) {
                             EkgMetricsCard(metrics = ekgMetrics)
                         }
 
-                        // Chips status — folosesc BPM din EKG
+                        // Chips status — folosesc BPM din ECG
                         if (ekgMetrics.bpm > 0) {
                             Row(
                                 modifier              = Modifier.fillMaxWidth(),
@@ -286,6 +298,7 @@ fun DashboardScreen(
                                 letterSpacing = 0.5.sp
                             )
                         }
+
                     }
                 }
 
@@ -564,4 +577,258 @@ private fun bpmZoneColor(bpm: Int) = when {
     bpm < 60   -> TextSecondary
     bpm <= 100 -> Ral5018Light
     else       -> Ral5018Main
+}
+
+// ── Ghid plasare electrozi ────────────────────────────────────────────────────
+
+private data class ElectrodeInfo(
+    val label: String,
+    val color: Color,
+    val limbDesc: String,
+    val chestDesc: String
+)
+
+@Composable
+private fun ElectrodeGuideCard() {
+    val guideElectrodes = listOf(
+        ElectrodeInfo("RA", Color(0xFFE53935), "Brațul drept",   "Sub claviculă dreaptă"),
+        ElectrodeInfo("LA", Color(0xFFFFD600), "Brațul stâng",   "Sub claviculă stângă"),
+        ElectrodeInfo("RL", Color(0xFF43A047), "Piciorul drept", "Abdomen inferior drept")
+    )
+
+    val infiniteTransition = rememberInfiniteTransition(label = "electrode_guide")
+
+    val stepFloat by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue  = 3f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "electrode_step"
+    )
+    val activeStep = stepFloat.toInt() % 3
+
+    val pulseRadius by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue  = 2.8f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse_radius"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.65f,
+        targetValue  = 0f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse_alpha"
+    )
+
+    Card(
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(20.dp),
+        colors    = CardDefaults.cardColors(containerColor = Color(0xFF0D1B2A)),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+
+            Text(
+                "PLASARE ELECTROZI",
+                fontSize      = 11.sp,
+                fontWeight    = FontWeight.Black,
+                color         = Color(0xFF00E676),
+                letterSpacing = 1.5.sp
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            // Column labels aligned over the two figures
+            Row(Modifier.fillMaxWidth()) {
+                Text(
+                    "Brațe / Picioare",
+                    modifier      = Modifier.weight(1f),
+                    textAlign     = TextAlign.Center,
+                    fontSize      = 10.sp,
+                    fontWeight    = FontWeight.SemiBold,
+                    color         = Color(0xFF4A7A9B),
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    "Piept",
+                    modifier      = Modifier.weight(1f),
+                    textAlign     = TextAlign.Center,
+                    fontSize      = 10.sp,
+                    fontWeight    = FontWeight.SemiBold,
+                    color         = Color(0xFF4A7A9B),
+                    letterSpacing = 0.5.sp
+                )
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            // Two human figures side-by-side with electrode dots
+            Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
+                val W  = size.width
+                val H  = size.height
+                val bg = Color(0xFF1A3550)
+                val ol = Color(0xFF2E5F8A)
+                val sw = 2.dp.toPx()
+                val hw = W / 2f          // half canvas width
+                val tw = hw * 0.17f      // torso half-width (shared scale)
+
+                val cx1 = hw * 0.5f      // left figure centre
+                val cx2 = hw * 1.5f      // right figure centre
+
+                // Vertical separator
+                drawLine(
+                    color       = Color(0xFF1E4060),
+                    start       = Offset(W * 0.5f, H * 0.02f),
+                    end         = Offset(W * 0.5f, H * 0.98f),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                // Both silhouettes share identical geometry; only electrode positions differ
+                for (cx in listOf(cx1, cx2)) {
+                    // Head
+                    val headR = hw * 0.11f
+                    drawCircle(bg, headR, Offset(cx, H * 0.08f))
+                    drawCircle(ol, headR, Offset(cx, H * 0.08f), style = Stroke(sw))
+
+                    // Torso
+                    val tT = H * 0.18f; val tB = H * 0.57f
+                    drawRoundRect(bg, Offset(cx - tw, tT), Size(tw * 2f, tB - tT), CornerRadius(6.dp.toPx()))
+                    drawRoundRect(ol, Offset(cx - tw, tT), Size(tw * 2f, tB - tT), CornerRadius(6.dp.toPx()), style = Stroke(sw))
+
+                    // Right arm (person's right = viewer's left)
+                    val rArm = Path().apply {
+                        moveTo(cx - tw, H * 0.22f)
+                        cubicTo(cx - tw * 1.9f, H * 0.26f, cx - tw * 2.1f, H * 0.40f, cx - tw * 1.9f, H * 0.55f)
+                    }
+                    drawPath(rArm, ol, style = Stroke(sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+                    // Left arm (person's left = viewer's right)
+                    val lArm = Path().apply {
+                        moveTo(cx + tw, H * 0.22f)
+                        cubicTo(cx + tw * 1.9f, H * 0.26f, cx + tw * 2.1f, H * 0.40f, cx + tw * 1.9f, H * 0.55f)
+                    }
+                    drawPath(lArm, ol, style = Stroke(sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+                    // Right leg (viewer's left)
+                    drawLine(ol, Offset(cx - tw * 0.43f, tB), Offset(cx - tw * 0.55f, H * 0.88f), strokeWidth = sw)
+                    // Left leg (viewer's right)
+                    drawLine(ol, Offset(cx + tw * 0.43f, tB), Offset(cx + tw * 0.55f, H * 0.88f), strokeWidth = sw)
+                }
+
+                // Left figure: limb placement — electrodes on arms and leg
+                //   RA (red)    → right arm (person's right = viewer's left arm)
+                //   LA (yellow) → left arm  (person's left  = viewer's right arm)
+                //   RL (green)  → right leg (person's right = viewer's left leg)
+                val limbDots = listOf(
+                    Offset(cx1 - tw * 1.90f, H * 0.39f),
+                    Offset(cx1 + tw * 1.90f, H * 0.38f),
+                    Offset(cx1 - tw * 0.52f, H * 0.73f)
+                )
+
+                // Right figure: chest placement — electrodes on torso
+                //   RA (red)    → right upper chest (viewer's left)
+                //   LA (yellow) → left upper chest  (viewer's right)
+                //   RL (green)  → lower abdomen
+                val chestDots = listOf(
+                    Offset(cx2 - tw * 0.65f, H * 0.27f),
+                    Offset(cx2 + tw * 0.65f, H * 0.26f),
+                    Offset(cx2 - tw * 0.32f, H * 0.47f)
+                )
+
+                val dotColors = listOf(Color(0xFFE53935), Color(0xFFFFD600), Color(0xFF43A047))
+                val dotR = 7.5.dp.toPx()
+
+                listOf(limbDots, chestDots).forEach { dots ->
+                    dots.forEachIndexed { i, pos ->
+                        val c = dotColors[i]
+                        val isActive = i == activeStep
+                        if (isActive) drawCircle(c.copy(alpha = pulseAlpha), dotR * pulseRadius, pos)
+                        drawCircle(c.copy(alpha = if (isActive) 0.25f else 0.10f), dotR * 1.7f, pos)
+                        drawCircle(c.copy(alpha = if (isActive) 1f    else 0.40f), dotR, pos)
+                        drawCircle(Color.White.copy(alpha = if (isActive) 0.90f else 0.28f), dotR * 0.38f, pos)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = Color(0xFF1A3550), thickness = 1.dp)
+            Spacer(Modifier.height(10.dp))
+
+            // Two-column legend mirrors the two figures
+            Row(Modifier.fillMaxWidth()) {
+                // Left column: limb descriptions
+                Column(Modifier.weight(1f).padding(end = 10.dp)) {
+                    guideElectrodes.forEachIndexed { i, el ->
+                        val isActive = i == activeStep
+                        Row(
+                            modifier              = Modifier.padding(vertical = 3.dp),
+                            verticalAlignment     = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(if (isActive) 10.dp else 8.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(el.color.copy(alpha = if (isActive) 1f else 0.38f))
+                            )
+                            Text(
+                                el.label,
+                                fontSize   = 10.sp,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                color      = el.color.copy(alpha = if (isActive) 1f else 0.5f),
+                                modifier   = Modifier.width(20.dp)
+                            )
+                            Text(
+                                el.limbDesc,
+                                fontSize   = 10.sp,
+                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                color      = if (isActive) Color.White else Color(0xFF5E849E)
+                            )
+                        }
+                    }
+                }
+
+                // Vertical rule
+                Box(
+                    Modifier
+                        .width(1.dp)
+                        .height(76.dp)
+                        .background(Color(0xFF1A3550))
+                )
+
+                // Right column: chest descriptions
+                Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                    guideElectrodes.forEachIndexed { i, el ->
+                        val isActive = i == activeStep
+                        Row(
+                            modifier              = Modifier.padding(vertical = 3.dp),
+                            verticalAlignment     = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(if (isActive) 10.dp else 8.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(el.color.copy(alpha = if (isActive) 1f else 0.38f))
+                            )
+                            Text(
+                                el.chestDesc,
+                                fontSize   = 10.sp,
+                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                color      = if (isActive) Color.White else Color(0xFF5E849E)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

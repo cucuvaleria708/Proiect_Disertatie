@@ -20,8 +20,6 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Shield
@@ -62,10 +60,8 @@ fun SettingsScreen(
     val userAge      by viewModel.userAge.collectAsStateWithLifecycle()
     val userWeight   by viewModel.userWeight.collectAsStateWithLifecycle()
 
-    val pulseState   by viewModel.pulseConnectionState.collectAsStateWithLifecycle()
-    val pulseDevices by viewModel.pulseDevices.collectAsStateWithLifecycle()
-    val ekgState     by viewModel.ekgConnectionState.collectAsStateWithLifecycle()
-    val ekgDevices   by viewModel.ekgDevices.collectAsStateWithLifecycle()
+    val esp32State   by viewModel.esp32ConnectionState.collectAsStateWithLifecycle()
+    val esp32Devices by viewModel.esp32Devices.collectAsStateWithLifecycle()
 
     // Stare locală profil — editabilă independent, salvată explicit la buton
     var localGender  by remember { mutableStateOf(userGender) }
@@ -92,20 +88,13 @@ fun SettingsScreen(
     val localHigh   = bpmHighThreshold(localAge)
 
     // BLE permissions
-    var scanTarget by remember { mutableStateOf("") }
     val bleScanLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        if (permissions.values.all { it }) {
-            when (scanTarget) {
-                "pulse" -> viewModel.startPulseScan()
-                "ekg"   -> viewModel.startEkgScan()
-            }
-        }
+        if (permissions.values.all { it }) viewModel.startScan()
     }
 
-    fun requestScan(target: String) {
-        scanTarget = target
+    fun requestScan() {
         val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(
                 Manifest.permission.BLUETOOTH_SCAN,
@@ -312,33 +301,18 @@ fun SettingsScreen(
                     }
                 }
 
-                // ── Conexiune senzor puls ────────────────────────────────────
+                // ── Conexiune modul ESP32 ────────────────────────────────────
                 SettingsSection(
-                    title = "Conexiune senzor puls",
-                    icon  = Icons.Filled.FavoriteBorder
+                    title = "Conexiune modul ESP32",
+                    icon  = Icons.Filled.Bluetooth
                 ) {
                     BleConnectionContent(
-                        connectionState = pulseState,
-                        devices         = pulseDevices,
-                        onScan          = { requestScan("pulse") },
-                        onStop          = { viewModel.stopPulseScan() },
-                        onConnect       = { viewModel.connectPulseDevice(it) },
-                        onDisconnect    = { viewModel.disconnectPulse() }
-                    )
-                }
-
-                // ── Conexiune senzor EKG ──────────────────────────────────────
-                SettingsSection(
-                    title = "Conexiune senzor EKG",
-                    icon  = Icons.Filled.MonitorHeart
-                ) {
-                    BleConnectionContent(
-                        connectionState = ekgState,
-                        devices         = ekgDevices,
-                        onScan          = { requestScan("ekg") },
-                        onStop          = { viewModel.stopEkgScan() },
-                        onConnect       = { viewModel.connectEkgDevice(it) },
-                        onDisconnect    = { viewModel.disconnectEkg() }
+                        connectionState = esp32State,
+                        devices         = esp32Devices,
+                        onScan          = { requestScan() },
+                        onStop          = { viewModel.stopScan() },
+                        onConnect       = { viewModel.connectDevice(it) },
+                        onDisconnect    = { viewModel.disconnect() }
                     )
                 }
 
@@ -353,15 +327,15 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(10.dp))
                     MenuGuideRow(
-                        name = "Verificare EKG",
+                        name = "Verificare ECG",
                         description = "Urmărește activitatea electrică a inimii tale în timp real, " +
-                            "direct de la senzorul EKG conectat. " +
+                            "direct de la senzorul ECG conectat. " +
                             "Poți salva oricând un segment al traseului pentru a-l analiza mai târziu."
                     )
                     Spacer(Modifier.height(10.dp))
                     MenuGuideRow(
                         name = "Analiză AI",
-                        description = "Lasă inteligența artificială să interpreteze traseul tău EKG. " +
+                        description = "Lasă inteligența artificială să interpreteze traseul tău ECG. " +
                             "Modelul detectează automat dacă ritmul este normal sau dacă există " +
                             "anomalii, și îți prezintă rezultatul într-un mod clar și ușor de înțeles."
                     )
@@ -390,7 +364,7 @@ fun SettingsScreen(
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Model AI", fontSize = 14.sp, color = TextSecondary)
-                        Text("CNN EKG · 4 clase", fontSize = 14.sp,
+                        Text("CNN ECG · 4 clase", fontSize = 14.sp,
                             fontWeight = FontWeight.Medium, color = TextPrimary)
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -399,7 +373,7 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Medium, color = TextPrimary)
                         Text("Senzor puls", fontSize = 14.sp,
                             fontWeight = FontWeight.Medium, color = TextPrimary)
-                        Text("Senzor EKG AD8232", fontSize = 14.sp,
+                        Text("Senzor ECG AD8232", fontSize = 14.sp,
                             fontWeight = FontWeight.Medium, color = TextPrimary)
                     }
                 }

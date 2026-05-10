@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -34,6 +37,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alex.monitorsanatate.ui.components.AppScreenHeader
 import com.alex.monitorsanatate.ui.theme.*
+
+private val ChartBg    = Color(0xFF0D1B2A)
+private val ChartGrid  = Color(0xFF1A3550)
+private val EcgGreen   = Color(0xFF00E676)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +60,7 @@ fun EcgAnalysisScreen(viewModel: EcgAnalysisViewModel = hiltViewModel()) {
 
             AppScreenHeader(
                 title = "Analiză AI",
-                subtitle = "Interpretare automată EKG"
+                subtitle = "Interpretare automată ECG"
             )
 
             Column(
@@ -100,7 +107,11 @@ fun EcgAnalysisScreen(viewModel: EcgAnalysisViewModel = hiltViewModel()) {
                                 }
                             }
                         } else {
-                            PredictionResultCard(state.predictedIndex, state.probabilities)
+                            PredictionResultCard(state.predictedIndex)
+
+                            Spacer(Modifier.height(16.dp))
+
+                            ProbabilityWaveformCard(state.predictedIndex, state.probabilities)
 
                             Spacer(Modifier.height(16.dp))
 
@@ -221,7 +232,56 @@ private fun ImagePreviewCard(bitmap: Bitmap, compact: Boolean) {
 }
 
 @Composable
-private fun PredictionResultCard(predictedIndex: Int, probabilities: List<Float>) {
+private fun ProbabilityChart(probabilities: List<Float>, predictedIndex: Int) {
+    val anim0 by animateFloatAsState(probabilities.getOrElse(0) { 0f }, tween(900, easing = FastOutSlowInEasing), label = "p0")
+    val anim1 by animateFloatAsState(probabilities.getOrElse(1) { 0f }, tween(900, easing = FastOutSlowInEasing), label = "p1")
+    val anim2 by animateFloatAsState(probabilities.getOrElse(2) { 0f }, tween(900, easing = FastOutSlowInEasing), label = "p2")
+    val anim3 by animateFloatAsState(probabilities.getOrElse(3) { 0f }, tween(900, easing = FastOutSlowInEasing), label = "p3")
+    val animProbs = listOf(anim0, anim1, anim2, anim3)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(ChartBg)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w      = size.width
+            val h      = size.height
+            val padX   = 20f
+            val padY   = 12f
+            val chartW = w - 2 * padX
+            val chartH = h - 2 * padY
+            val n      = animProbs.size
+
+            // Horizontal grid lines at 25 / 50 / 75 %
+            listOf(0.25f, 0.50f, 0.75f).forEach { pct ->
+                val y = padY + chartH * (1f - pct)
+                drawLine(ChartGrid, Offset(padX, y), Offset(w - padX, y), strokeWidth = 0.8f)
+            }
+            // Baseline
+            drawLine(ChartGrid, Offset(padX, padY + chartH), Offset(w - padX, padY + chartH), strokeWidth = 1.2f)
+
+            // Vertical bars
+            val sectionW    = chartW / n
+            val barW        = sectionW * 0.50f
+            val barHOffset  = (sectionW - barW) / 2f
+
+            animProbs.forEachIndexed { i, prob ->
+                val barH  = (chartH * prob).coerceAtLeast(0f)
+                val left  = padX + i * sectionW + barHOffset
+                val top   = padY + chartH - barH
+                val color = Color(ECG_CLASSES[i].colorLong)
+                    .let { c -> if (i == predictedIndex) c else c.copy(alpha = 0.35f) }
+                drawRect(color, Offset(left, top), Size(barW, barH))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PredictionResultCard(predictedIndex: Int) {
     val predicted = ECG_CLASSES.getOrNull(predictedIndex)
     val pColor    = predicted?.let { Color(it.colorLong) } ?: TextSecondary
 
@@ -239,14 +299,14 @@ private fun PredictionResultCard(predictedIndex: Int, probabilities: List<Float>
 
                 predicted?.let {
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = pColor.copy(alpha = 0.15f),
+                        shape  = RoundedCornerShape(20.dp),
+                        color  = pColor.copy(alpha = 0.15f),
                         border = androidx.compose.foundation.BorderStroke(1.dp, pColor.copy(alpha = 0.3f))
                     ) {
                         Text(
-                            text = it.label.uppercase(),
+                            text     = it.label.uppercase(),
                             fontSize = 11.sp,
-                            color = pColor,
+                            color    = pColor,
                             fontWeight = FontWeight.Black,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
@@ -261,60 +321,66 @@ private fun PredictionResultCard(predictedIndex: Int, probabilities: List<Float>
                 Spacer(Modifier.height(8.dp))
                 Text(it.description, fontSize = 14.sp, color = TextSecondary, lineHeight = 20.sp)
             }
+        }
+    }
+}
 
-            Spacer(Modifier.height(24.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
-            Spacer(Modifier.height(20.dp))
+@Composable
+private fun ProbabilityWaveformCard(predictedIndex: Int, probabilities: List<Float>) {
+    Card(
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(20.dp),
+        colors    = CardDefaults.cardColors(containerColor = ChartBg),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp)) {
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Text("DISTRIBUȚIE PROBABILITĂȚI", fontSize = 11.sp, fontWeight = FontWeight.Black,
+                    color = EcgGreen, letterSpacing = 1.5.sp)
+                Text("CNN · 4 clase", fontSize = 10.sp, color = EcgGreen.copy(alpha = 0.5f))
+            }
 
-            Text(
-                "DISTRIBUȚIE PROBABILITĂȚI", fontSize = 11.sp, color = TextSecondary,
-                fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.padding(bottom = 16.dp)
-            )
+            Spacer(Modifier.height(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ChartBg)
+            ) {
+                ProbabilityChart(probabilities = probabilities, predictedIndex = predictedIndex)
+            }
+
+            Spacer(Modifier.height(12.dp))
 
             ECG_CLASSES.forEach { cls ->
                 val prob    = probabilities.getOrElse(cls.index) { 0f }
                 val clColor = Color(cls.colorLong)
                 val isTop   = cls.index == predictedIndex
-                val anim    by animateFloatAsState(prob, tween(1000, easing = FastOutSlowInEasing), label = "bar_${cls.index}")
-
-                Column(modifier = Modifier.padding(bottom = 14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(clColor.copy(alpha = if (isTop) 1f else 0.4f)))
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = cls.label,
-                            fontSize = 13.sp,
-                            color = if (isTop) TextPrimary else TextSecondary,
-                            fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .width(100.dp)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(AppSurfaceOverlay)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(anim)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(clColor)
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        val pct = prob * 100
-                        val pctText = if (pct < 0.01f) "< 0.01%" else String.format("%.2f%%", pct)
-                        Text(
-                            text = pctText,
-                            fontSize = 12.sp,
-                            color = if (isTop) clColor else TextSecondary,
-                            fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
-                            modifier = Modifier.width(52.dp),
-                            textAlign = TextAlign.End
-                        )
-                    }
+                val pct     = prob * 100
+                val pctText = if (pct < 0.01f) "< 0.01%" else String.format("%.2f%%", pct)
+                Row(
+                    modifier          = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(7.dp),
+                        shape    = CircleShape,
+                        color    = clColor.copy(alpha = if (isTop) 1f else 0.4f)
+                    ) {}
+                    Spacer(Modifier.width(8.dp))
+                    Text(cls.label, fontSize = 13.sp,
+                        color      = if (isTop) Color.White else Color.White.copy(alpha = 0.5f),
+                        fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
+                        modifier   = Modifier.weight(1f))
+                    Text(pctText, fontSize = 12.sp,
+                        color      = if (isTop) clColor else Color.White.copy(alpha = 0.4f),
+                        fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal)
                 }
             }
         }

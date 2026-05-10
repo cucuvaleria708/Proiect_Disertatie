@@ -57,8 +57,8 @@ class HistoryViewModel @Inject constructor(
     val measurements: StateFlow<List<Measurement>> = getMeasurementHistoryUseCase()
         .combine(_currentFilter) { list, filter ->
             when (filter) {
-                "Puls" -> list.filter { it.measurementType != "EKG" && it.measurementType != "AI_ECG" }
-                "EKG"  -> list.filter { it.measurementType == "EKG" }
+                "Puls" -> list.filter { it.measurementType != "ECG" && it.measurementType != "EKG" && it.measurementType != "AI_ECG" }
+                "ECG"  -> list.filter { it.measurementType == "ECG" || it.measurementType == "EKG" }
                 "AI"   -> list.filter { it.measurementType == "AI_ECG" }
                 else   -> list
             }
@@ -69,10 +69,10 @@ class HistoryViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    // ECG waveform al celei mai recente înregistrări EKG (încărcat când filtrul este "EKG")
+    // ECG waveform al celei mai recente înregistrări ECG (încărcat când filtrul este "ECG")
     val latestEcgData: StateFlow<List<Float>> = measurements
         .combine(_currentFilter) { list, filter ->
-            if (filter == "EKG") list.maxByOrNull { it.startTime }?.id else null
+            if (filter == "ECG") list.maxByOrNull { it.startTime }?.id else null
         }
         .distinctUntilChanged()
         .flatMapLatest { id ->

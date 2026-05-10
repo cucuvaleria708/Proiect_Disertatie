@@ -28,10 +28,10 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  State-ul panoului de metrici EKG
+//  State-ul panoului de metrici ECG
 // ─────────────────────────────────────────────────────────────────────────────
 data class EkgMetrics(
-    val bpm: Int            = 0,    // BPM calculat din interval R-R al semnalului EKG
+    val bpm: Int            = 0,    // BPM calculat din interval R-R al semnalului ECG
     val rrIntervalMs: Int   = 0,    // interval intre batai (ms)
     val hrv: Float          = 0f,   // RMSSD (ms) — variabilitate ritm cardiac
     val pnn50: Int          = 0,    // % intervale R-R cu diferenta >50ms
@@ -72,7 +72,7 @@ class DashboardViewModel @Inject constructor(
     private val _finalBpm = MutableStateFlow(0)
     val finalBpm: StateFlow<Int> = _finalBpm
 
-    // ── Metrici EKG calculate pe Android ─────────────────────────────────────
+    // ── Metrici ECG calculate pe Android ─────────────────────────────────────
     private val _ekgMetrics = MutableStateFlow(EkgMetrics())
     val ekgMetrics: StateFlow<EkgMetrics> = _ekgMetrics
 
@@ -137,7 +137,7 @@ class DashboardViewModel @Inject constructor(
             }
         }
 
-        // Calculeaza metrici EKG la fiecare 3 secunde
+        // Calculeaza metrici ECG la fiecare 3 secunde
         viewModelScope.launch {
             while (true) {
                 delay(3000)
@@ -164,7 +164,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Captureza EKG → Bitmap → navigheaza la Analiza AI
+    //  Captureza ECG → Bitmap → navigheaza la Analiza AI
     // ─────────────────────────────────────────────────────────────────────────
     fun captureAndNavigateToEcgAnalysis() {
         val points = _ecgPoints.value
@@ -177,7 +177,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Calcul metrici EKG pe Android (R-peaks, HRV, interpretare)
+    //  Calcul metrici ECG pe Android (R-peaks, HRV, interpretare)
     // ─────────────────────────────────────────────────────────────────────────
     private fun computeEkgMetrics(points: List<Float>, pulseSensorBpm: Int): EkgMetrics {
         val peaks = detectRPeaks(points)
@@ -203,7 +203,7 @@ class DashboardViewModel @Inject constructor(
         val nn50 = rrMs.zipWithNext { a, b -> abs(b - a) > 50 }.count { it }
         val pnn50 = if (rrMs.size > 1) (nn50 * 100) / (rrMs.size - 1) else 0
 
-        // BPM si interval R-R calculate exclusiv din semnalul EKG (AD8232)
+        // BPM si interval R-R calculate exclusiv din semnalul ECG (AD8232)
         val rrMean = rrMs.average().toInt()
         val ecgBpm = if (rrMean > 0) 60000 / rrMean else 0
 
@@ -264,7 +264,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Render EKG → Bitmap 256×256 pentru modelul AI
+    //  Render ECG → Bitmap 256×256 pentru modelul AI
     // ─────────────────────────────────────────────────────────────────────────
     private fun renderEcgToBitmap(points: List<Float>): Bitmap {
         val size   = 256
@@ -315,7 +315,7 @@ class DashboardViewModel @Inject constructor(
                         averageBpm       = validBpms.average().toInt(),
                         minBpm           = validBpms.min(),
                         maxBpm           = validBpms.max(),
-                        measurementType  = "EKG",
+                        measurementType  = "ECG",
                         connectionMethod = ConnectionMethod.BLE,
                         ecgData          = ecgSnapshot
                     )
