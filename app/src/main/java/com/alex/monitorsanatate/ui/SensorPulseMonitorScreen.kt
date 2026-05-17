@@ -167,7 +167,8 @@ fun SensorPulseMonitorScreen(onNavigateBack: () -> Unit) {
                         userAge       = userAge,
                         userGender    = userGender,
                         userWeight    = userWeight,
-                        onStart       = { viewModel.sendStartCommand() }
+                        onStart       = { viewModel.sendStartCommand() },
+                        onReset       = { viewModel.sendResetCommand() }
                     )
                 }
             }
@@ -187,7 +188,8 @@ private fun PulsTab(
     userAge: Int,
     userGender: String,
     userWeight: Float,
-    onStart: () -> Unit
+    onStart: () -> Unit,
+    onReset: () -> Unit
 ) {
     // Card BPM hero cu BpmGauge (semiluna)
     Card(
@@ -203,12 +205,12 @@ private fun PulsTab(
             val gaugeBpm = when (status) {
                 "finalizat" -> finalBpm
                 "masurare"  -> currentBpm
-                else        -> if (currentBpm > 40) currentBpm else 0
+                else        -> if (currentBpm > 40 && semnalValid) currentBpm else 0
             }
             val gaugeConnected = when (status) {
                 "finalizat" -> finalBpm > 0
                 "masurare"  -> true
-                else        -> currentBpm > 40
+                else        -> currentBpm > 40 && semnalValid
             }
 
             BpmGauge(
@@ -282,8 +284,8 @@ private fun PulsTab(
     Spacer(Modifier.height(16.dp))
 
     Button(
-        onClick  = onStart,
-        enabled  = status == "asteptare",
+        onClick  = { if (status == "finalizat") onReset() else onStart() },
+        enabled  = status == "asteptare" || status == "finalizat",
         modifier = Modifier.fillMaxWidth().height(56.dp),
         shape    = RoundedCornerShape(18.dp),
         colors   = ButtonDefaults.buttonColors(
@@ -295,22 +297,21 @@ private fun PulsTab(
         Text(
             text = when {
                 status == "masurare"  -> "Măsurare în curs..."
-                status == "finalizat" -> "Se resetează..."
+                status == "finalizat" -> "Măsoară din nou"
                 !semnalValid          -> "Începe (Semnal Slab) · 15s"
                 else                  -> "Începe Măsurarea  ·  15s"
             },
             fontSize   = 15.sp,
             fontWeight = FontWeight.Bold,
-            color      = if (status == "asteptare") TextPrimary else TextSecondary
+            color      = if (status == "masurare") TextSecondary else TextPrimary
         )
     }
 
     Spacer(Modifier.height(10.dp))
     Text(
-        if (semnalValid) "Semnal stabil. Poți începe."
-        else "Plasează degetul ferm pe senzor pentru rezultate precise.",
+        "Plasează degetul ferm pe senzor pentru rezultate precise.",
         fontSize  = 12.sp,
-        color     = if (semnalValid) Ral5018Main else TextSecondary,
+        color     = TextSecondary,
         textAlign = TextAlign.Center
     )
 }

@@ -109,9 +109,11 @@ fun CameraPulseContent(onNavigateBack: () -> Unit) {
         HeartRateAnalyzer { detectedBpm, fingerPresent, calibrating ->
             bpm              = detectedBpm
             isFingerDetected = fingerPresent
-            isCalibrating    = calibrating
+            // Nu actualiza starea de calibrare in timpul masuratoriI — afiseaza ultima valoare stabila
+            if (!isMeasuring) isCalibrating = calibrating
             if (fingerPresent && isMeasuring && detectedBpm > 0) measuredBpms.add(detectedBpm)
-            if (!fingerPresent) measuredBpms.clear()
+            // Nu sterge BPM-urile colectate daca degetul e pierdut temporar in timp ce masoaram
+            if (!fingerPresent && !isMeasuring) measuredBpms.clear()
         }
     }
 
@@ -119,7 +121,7 @@ fun CameraPulseContent(onNavigateBack: () -> Unit) {
     val cameraControl     = remember { mutableStateOf<CameraControl?>(null) }
     val cameraProviderRef = remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
-    LaunchedEffect(isMeasuring, isFingerDetected) {
+    LaunchedEffect(isMeasuring) {
         if (isMeasuring && isFingerDetected) {
             status = "masurare"
             measuredBpms.clear()
@@ -736,18 +738,22 @@ class HeartRateAnalyzer(
 
         if (std < 0.3f) return 0
 
-        val threshold   = mean + 0.25f * std
-        val peaks       = mutableListOf<Int>()
-        var lastPeakIdx = -20
+        // Prag mai strict (0.5 std) pentru a evita detecția zgomotului ca vârfuri
+        val threshold    = mean + 0.5f * std
+        val peaks        = mutableListOf<Int>()
+        // Spațiere minimă bazată pe TIMP (400ms = max 150 BPM), nu pe număr de cadre.
+        // Vechea logică frame-count (15 cadre) limita detecția la ~60 BPM când Android
+        // procesa cadre cu STRATEGY_KEEP_ONLY_LATEST la ~15fps efectiv.
+        var lastPeakTime = 0L
 
         for (i in 2 until frameValues.size - 2) {
             val v = frameValues[i]
             if (v > frameValues[i - 1] && v > frameValues[i - 2] &&
                 v > frameValues[i + 1] && v > frameValues[i + 2] &&
-                v > threshold && (i - lastPeakIdx) >= 15
+                v > threshold && (timestamps[i] - lastPeakTime) >= 400L
             ) {
                 peaks.add(i)
-                lastPeakIdx = i
+                lastPeakTime = timestamps[i]
             }
         }
 
@@ -761,9 +767,13 @@ class HeartRateAnalyzer(
 
         if (intervals.isEmpty()) return 0
 
-        val sorted   = intervals.sorted()
-        val medianMs = sorted[sorted.size / 2].toDouble()
+        // Filtru consistență: respinge intervale ce deviază >40% față de mediană
+        val sorted      = intervals.sorted()
+        val medianMs    = sorted[sorted.size / 2].toDouble()
+        val consistent  = sorted.filter { kotlin.math.abs(it - medianMs) < medianMs * 0.4 }
+        if (consistent.isEmpty()) return 0
+        val finalMedian = consistent.sorted().let { it[it.size / 2] }.toDouble()
 
-        return (60000.0 / medianMs).toInt().coerceIn(40, 200)
+        return (60000.0 / finalMedian).toInt().coerceIn(40, 200)
     }
 }

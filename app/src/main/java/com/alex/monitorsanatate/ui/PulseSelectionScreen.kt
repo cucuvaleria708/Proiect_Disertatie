@@ -66,32 +66,6 @@ fun PulseSelectionScreen(
                 onClick = onNavigateToCamera
             )
             
-            Spacer(Modifier.height(40.dp))
-            
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = AppSurface)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FlashOn,
-                        contentDescription = null,
-                        tint = Ral5018Light,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "Metoda cu cameră funcționează cel mai bine în lumină bună sau cu blițul pornit.",
-                        fontSize = 12.sp,
-                        color = TextSecondary,
-                        lineHeight = 16.sp
-                    )
-                }
-            }
             }
         }
     }

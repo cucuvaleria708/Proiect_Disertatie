@@ -83,6 +83,7 @@ class SensorPulseViewModel @Inject constructor(
     }
 
     fun sendStartCommand() { connectionRepository.sendCommand("START") }
+    fun sendResetCommand() { connectionRepository.sendCommand("RESET") }
 
     private fun clearEcgBuffer() {
         ecgAccumulator.clear()
