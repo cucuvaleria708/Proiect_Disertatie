@@ -37,8 +37,8 @@ fun ChartsScreen(
     val measurements   by viewModel.measurements.collectAsStateWithLifecycle()
     val latestEcgData  by viewModel.latestEcgData.collectAsStateWithLifecycle()
 
-    val isEkg   = chartFilter == "ECG"
-    val isAi    = chartFilter == "AI"
+    val isEkg   = chartFilter == "Traseu ECG"
+    val isAi    = chartFilter == "Predicție"
     val accentColor = when {
         isEkg -> Ral5018Main
         isAi  -> Color(0xFF6750A4)
@@ -110,8 +110,8 @@ fun ChartsScreen(
             if (isAi) {
                 // ── Grafic distribuție rezultate AI ──────────────────────────
                 SectionHeader(
-                    title    = "Distribuție rezultate AI",
-                    subtitle = "Frecvența fiecărui diagnostic detectat de rețeaua neurală"
+                    title    = "Distribuție rezultate Predicție ECG",
+                    subtitle = "Frecvența fiecărui diagnostic detectat de modelul CNN"
                 )
                 AiResultsChart(measurements = measurements)
             } else {

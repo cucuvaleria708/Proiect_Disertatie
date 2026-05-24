@@ -40,7 +40,7 @@ enum class BottomNavItem(
 ) {
     PULSE(Screen.PulseMonitor, "Verificare Puls", Icons.Filled.Favorite),
     LIVE(Screen.Dashboard,    "Verificare ECG",   Icons.Filled.GraphicEq),
-    ANALYSIS(Screen.EcgAnalysis, "Analiză AI", Icons.Filled.ImageSearch),
+    ANALYSIS(Screen.EcgAnalysis, "Predicție ECG", Icons.Filled.ImageSearch),
     HISTORY(Screen.History,   "Jurnal",    Icons.Filled.History),
     SETTINGS(Screen.Settings, "Setări",     Icons.Filled.Settings),
 }

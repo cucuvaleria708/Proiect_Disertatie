@@ -8,6 +8,8 @@ import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alex.monitorsanatate.di.EcgSnapshotHolder
+import com.alex.monitorsanatate.ui.ecgdetail.BEAT_CLASSES
+import com.alex.monitorsanatate.ui.ecgdetail.EcgBeatClassifier
 import com.alex.monitorsanatate.ui.ecgdetail.EcgImageGenerator
 import com.alex.monitorsanatate.domain.model.ConnectionMethod
 import com.alex.monitorsanatate.domain.model.ConnectionState
@@ -53,6 +55,12 @@ enum class InterpretationColor { GREEN, YELLOW, RED, NEUTRAL }
 
 enum class MeasurementState { IDLE, MEASURING, RESULT }
 
+data class BeatPrediction(
+    val dominantClass: Int,
+    val beatsAnalyzed: Int,
+    val classProbs: List<Float>
+)
+
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -95,6 +103,15 @@ class DashboardViewModel @Inject constructor(
     private val _exportMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val exportMessage: SharedFlow<String> = _exportMessage
 
+    // ── Predicție beat ECG (model 1D CNN, MIT-BIH 5 clase) ───────────────────
+    private val _beatPrediction = MutableStateFlow<BeatPrediction?>(null)
+    val beatPrediction: StateFlow<BeatPrediction?> = _beatPrediction
+
+    private val _isClassifying = MutableStateFlow(false)
+    val isClassifying: StateFlow<Boolean> = _isClassifying
+
+    private val beatClassifier: EcgBeatClassifier by lazy { EcgBeatClassifier(context) }
+
     private val ecgBuffer = mutableListOf<Float>()
     private val maxBufferSize = 2500
 
@@ -110,14 +127,19 @@ class DashboardViewModel @Inject constructor(
                 _timeRemaining.value = data.timeRemaining
                 _finalBpm.value      = data.finalBpm
 
-                // Actualizeaza starea masuratoare pe baza status-ului din firmware
-                _measurementState.value = when (data.status) {
+                // Detectare tranzitie MEASURING → RESULT pentru a declansa clasificarea
+                val prevMeasState = _measurementState.value
+                val newMeasState  = when (data.status) {
                     "masurare"  -> MeasurementState.MEASURING
                     "finalizat" -> MeasurementState.RESULT
-                    else        -> if (_measurementState.value == MeasurementState.RESULT)
-                                       MeasurementState.RESULT  // pastreaza rezultatul pana la reset
+                    else        -> if (prevMeasState == MeasurementState.RESULT)
+                                       MeasurementState.RESULT
                                    else MeasurementState.IDLE
                 }
+                if (prevMeasState == MeasurementState.MEASURING && newMeasState == MeasurementState.RESULT) {
+                    triggerBeatClassification()
+                }
+                _measurementState.value = newMeasState
 
                 if (data.bpm > 0 && wasConnected) sessionBpmValues.add(data.bpm)
 
@@ -179,10 +201,68 @@ class DashboardViewModel @Inject constructor(
     // ─────────────────────────────────────────────────────────────────────────
     fun startMeasurement() {
         if (_measurementState.value == MeasurementState.MEASURING) return
-        if (!_leadOffOk.value) return  // electrozi nedetectați pe piele
-        _measurementState.value = MeasurementState.IDLE  // reset vizual imediat
-        _finalBpm.value = 0
+        if (!_leadOffOk.value) return
+        _measurementState.value = MeasurementState.IDLE
+        _finalBpm.value         = 0
+        _beatPrediction.value   = null
         connectionRepository.sendCommand("START")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Clasificare automată a bătăilor ECG după măsurarea de 20s
+    // ─────────────────────────────────────────────────────────────────────────
+    private fun triggerBeatClassification() {
+        val snapshot = ecgBuffer.toList()
+        if (snapshot.size < 500) return
+        viewModelScope.launch {
+            _isClassifying.value = true
+            val pred = withContext(Dispatchers.Default) { classifyBeats(snapshot) }
+            _beatPrediction.value = pred
+            _isClassifying.value  = false
+            pred?.let { p ->
+                val now      = System.currentTimeMillis()
+                val bpm      = _finalBpm.value.takeIf { it > 0 } ?: _ekgMetrics.value.bpm
+                val label    = BEAT_CLASSES.getOrNull(p.dominantClass)?.label ?: "Necunoscut"
+                val probsStr = p.classProbs.joinToString(",") { "%.4f".format(it) }
+                saveMeasurementUseCase(
+                    Measurement(
+                        startTime        = now - 20_000L,
+                        endTime          = now,
+                        averageBpm       = bpm,
+                        minBpm           = bpm,
+                        maxBpm           = bpm,
+                        measurementType  = "AI_ECG",
+                        connectionMethod = ConnectionMethod.BLE,
+                        aiResult         = label,
+                        aiProbabilities  = probsStr,
+                        ecgData          = snapshot.takeLast(2500)
+                    )
+                )
+            }
+        }
+    }
+
+    private fun classifyBeats(normalizedBuffer: List<Float>): BeatPrediction? {
+        val rawBuffer = normalizedBuffer.map { it * 1023f }
+        beatClassifier.preloadModule()
+        val peaks = beatClassifier.detectRPeaks(rawBuffer)
+        if (peaks.isEmpty()) return null
+        val results = peaks.mapNotNull { peak ->
+            beatClassifier.extractBeat(rawBuffer, peak)?.let { beat ->
+                beatClassifier.classify(beat)
+            }
+        }
+        if (results.isEmpty()) return null
+        val nClasses = BEAT_CLASSES.size
+        val avgProbs = FloatArray(nClasses) { idx ->
+            results.map { it.probabilities.getOrElse(idx) { 0f } }.average().toFloat()
+        }
+        val dominantIdx = avgProbs.indices.maxByOrNull { avgProbs[it] } ?: 0
+        return BeatPrediction(
+            dominantClass = dominantIdx,
+            beatsAnalyzed = results.size,
+            classProbs    = avgProbs.toList()
+        )
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -66,7 +66,7 @@ fun EcgAnalysisScreen(viewModel: EcgAnalysisViewModel = hiltViewModel()) {
         Column(modifier = Modifier.fillMaxSize()) {
 
             AppScreenHeader(
-                title = "Analiză AI",
+                title = "Predicție ECG",
                 subtitle = "Interpretare automată ECG"
             )
 
@@ -313,7 +313,7 @@ private fun PredictionResultCard(predictedIndex: Int) {
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Text("DIAGNOSTIC AI", fontSize = 11.sp, color = TextSecondary, letterSpacing = 1.5.sp, fontWeight = FontWeight.Black)
+                Text("DIAGNOSTIC ECG", fontSize = 11.sp, color = TextSecondary, letterSpacing = 1.5.sp, fontWeight = FontWeight.Black)
 
                 predicted?.let {
                     Surface(
@@ -418,7 +418,7 @@ private fun MedicalDisclaimerCard() {
             Icon(Icons.Filled.Warning, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(12.dp))
             Text(
-                "Rezultat orientativ generat de AI. Nu înlocuiește diagnosticul oficial al unui medic cardiolog.",
+                "Rezultat orientativ. Nu înlocuiește diagnosticul oficial al unui medic cardiolog.",
                 fontSize = 12.sp, color = TextSecondary, lineHeight = 18.sp, fontWeight = FontWeight.Medium
             )
         }

@@ -334,10 +334,10 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(10.dp))
                     MenuGuideRow(
-                        name = "Analiză AI",
-                        description = "Lasă inteligența artificială să interpreteze traseul tău ECG. " +
-                            "Modelul detectează automat dacă ritmul este normal sau dacă există " +
-                            "anomalii, și îți prezintă rezultatul într-un mod clar și ușor de înțeles."
+                        name = "Predicție ECG",
+                        description = "Modelul CNN analizează traseul tău ECG și detectează automat " +
+                            "dacă ritmul este normal sau dacă există anomalii, prezentând " +
+                            "rezultatul într-un mod clar și ușor de înțeles."
                     )
                     Spacer(Modifier.height(10.dp))
                     MenuGuideRow(
@@ -363,7 +363,7 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Medium, color = TextPrimary)
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Model AI", fontSize = 14.sp, color = TextSecondary)
+                        Text("Model predicție ECG", fontSize = 14.sp, color = TextSecondary)
                         Text("CNN ECG · 4 clase", fontSize = 14.sp,
                             fontWeight = FontWeight.Medium, color = TextPrimary)
                     }

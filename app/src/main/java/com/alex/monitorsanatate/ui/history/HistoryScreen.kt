@@ -15,7 +15,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoGraph
@@ -162,10 +161,10 @@ fun HistoryScreen(
     // ── Dialog confirmare ștergere toate vizibile ─────────────────────────────
     if (showDeleteAllDialog) {
         val labelFiltru = when (currentFilter) {
-            "Puls" -> "Puls"
-            "ECG"  -> "ECG"
-            "AI"   -> "AI ECG"
-            else   -> "toate categoriile"
+            "Ritm Cardiac" -> "Ritm Cardiac"
+            "Traseu ECG"   -> "Traseu ECG"
+            "Predicție"    -> "Predicție ECG"
+            else           -> "toate categoriile"
         }
         AlertDialog(
             onDismissRequest = { showDeleteAllDialog = false },
@@ -201,84 +200,91 @@ fun HistoryScreen(
         Column(modifier = Modifier.fillMaxSize()) {
 
             AppScreenHeader(
-                title = "Jurnal",
+                title    = "Jurnal",
                 subtitle = "Înregistrările tale",
-                actions = {
-                    if (currentFilter == "Puls" || currentFilter == "ECG" || currentFilter == "AI") {
-                        IconButton(
-                            onClick = { onNavigateToCharts(currentFilter) },
-                            modifier = Modifier.padding(end = 4.dp)
-                        ) {
+                actions  = {
+                    // Buton Coș
+                    IconButton(
+                        onClick  = { if (measurements.isNotEmpty()) showDeleteAllDialog = true },
+                        enabled  = measurements.isNotEmpty()
+                    ) {
+                        Icon(
+                            Icons.Outlined.DeleteOutline,
+                            contentDescription = "Șterge toate",
+                            tint     = if (measurements.isNotEmpty()) Color(0xFFEF5350) else TextDisabled,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    // Buton PDF
+                    IconButton(onClick = exportPdf, enabled = !isExporting) {
+                        if (isExporting) {
+                            CircularProgressIndicator(
+                                modifier    = Modifier.size(18.dp),
+                                color       = PulseRedMain,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.PictureAsPdf,
+                                contentDescription = "Export PDF",
+                                tint     = PulseRedMain,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    // Buton grafice (doar pentru filtrele cu date grafice)
+                    if (currentFilter == "Ritm Cardiac" || currentFilter == "Traseu ECG" || currentFilter == "Predicție") {
+                        IconButton(onClick = { onNavigateToCharts(currentFilter) }) {
                             Icon(
                                 Icons.Filled.Timeline,
-                                contentDescription = "Deschide grafice $currentFilter",
+                                contentDescription = "Deschide grafice",
                                 tint = when (currentFilter) {
-                                    "ECG" -> Ral5018Light
-                                    "AI"  -> Color(0xFF6750A4)
-                                    else  -> PulseRedMain
+                                    "Traseu ECG" -> Ral5018Light
+                                    "Predicție"  -> Color(0xFF6750A4)
+                                    else         -> PulseRedMain
                                 },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
                 }
             )
 
-            // ── [Coș] [PDF]  [Toate] [Puls] [ECG] [AI] — o singură linie fixă ──
+            // ── Filtre ─────────────────────────────────────────────────────────
             Row(
-                modifier = Modifier
+                modifier              = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // 1. Buton Coș
-                IconButton(
-                    onClick = { if (measurements.isNotEmpty()) showDeleteAllDialog = true },
-                    enabled = measurements.isNotEmpty(),
-                    modifier = Modifier.size(36.dp).background(AppSurfaceHigh, CircleShape)
-                ) {
-                    Icon(
-                        Icons.Outlined.DeleteOutline, "Șterge toate",
-                        tint = if (measurements.isNotEmpty()) Color(0xFFEF5350) else TextDisabled,
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
-
-                // 2. Buton PDF
-                IconButton(
-                    onClick = exportPdf,
-                    enabled = !isExporting,
-                    modifier = Modifier.size(36.dp).background(AppSurfaceHigh, CircleShape)
-                ) {
-                    if (isExporting) {
-                        CircularProgressIndicator(Modifier.size(15.dp), color = PulseRedMain, strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Default.PictureAsPdf, "Export PDF", tint = PulseRedMain, modifier = Modifier.size(17.dp))
+                listOf("Toate", "Ritm Cardiac", "Traseu ECG", "Predicție").forEach { filter ->
+                    val isSelected    = currentFilter == filter
+                    val selectedColor = when (filter) {
+                        "Ritm Cardiac" -> PulseRedMain
+                        "Traseu ECG"   -> Ral5018Main
+                        "Predicție"    -> Color(0xFF6750A4)
+                        else           -> Ral5018Main
                     }
-                }
-
-                // 3–6. Chip-uri filtre — fiecare ocupa spatiu egal din ce ramane
-                listOf("Toate", "Puls", "ECG", "AI").forEach { filter ->
-                    val isSelected = currentFilter == filter
                     Surface(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(50))
                             .clickable { viewModel.setFilter(filter) },
-                        color = if (isSelected) Ral5018Main else AppSurfaceHigh,
+                        color = if (isSelected) selectedColor else AppSurfaceHigh,
                         shape = RoundedCornerShape(50)
                     ) {
                         Text(
-                            text = filter,
-                            modifier = Modifier
+                            text       = filter,
+                            modifier   = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            fontSize = 12.sp,
+                                .padding(horizontal = 4.dp, vertical = 8.dp),
+                            fontSize   = 10.sp,
+                            lineHeight  = 13.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) Color.White else TextSecondary,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1
+                            color      = if (isSelected) Color.White else TextSecondary,
+                            textAlign  = TextAlign.Center,
+                            maxLines   = 2
                         )
                     }
                 }
@@ -345,7 +351,7 @@ private fun MeasurementCard(
     val isAI  = measurement.measurementType == "AI_ECG"
 
     val (zoneLabel, zoneColor) = when {
-        isAI       -> (measurement.aiResult ?: "Analiză AI") to Color(0xFF6750A4)
+        isAI       -> (measurement.aiResult ?: "Predicție ECG") to Color(0xFF6750A4)
         bpm < 50   -> "Bradicardie severă" to Color(0xFFB71C1C)
         bpm < 60   -> "Bradicardie"         to WarningAmber
         bpm <= 100 -> "Normal"              to SuccessGreen
@@ -380,7 +386,7 @@ private fun MeasurementCard(
                         when {
                             isAI  -> Color(0xFF6750A4).copy(alpha = 0.15f)
                             isEcg -> Ral5018Container.copy(alpha = 0.4f)
-                            else  -> MedicalBlueContainer.copy(alpha = 0.2f)
+                            else  -> PulseRedMain.copy(alpha = 0.15f)
                         }
                     ),
                 contentAlignment = Alignment.Center
@@ -394,8 +400,8 @@ private fun MeasurementCard(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            "AI",
-                            fontSize = 14.sp,
+                            "Pred",
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Black,
                             color = Color(0xFF6750A4)
                         )
@@ -450,16 +456,16 @@ private fun MeasurementCard(
                         color = when {
                             isAI  -> Color(0xFF6750A4).copy(alpha = 0.15f)
                             isEcg -> Ral5018Container.copy(alpha = 0.5f)
-                            else  -> AppSurface
+                            else  -> PulseRedMain.copy(alpha = 0.12f)
                         }
                     ) {
                         Text(
-                            when { isAI -> "AI ECG"; isEcg -> "ECG"; else -> "Puls" },
+                            when { isAI -> "Predicție ECG"; isEcg -> "ECG"; else -> "Puls" },
                             fontSize = 10.sp,
                             color = when {
                                 isAI  -> Color(0xFF6750A4)
                                 isEcg -> Ral5018Light
-                                else  -> TextSecondary
+                                else  -> PulseRedMain
                             },
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
@@ -690,7 +696,7 @@ private fun generateMedicalPdf(
         val pulsCount = measurements.count { it.measurementType != "ECG" && it.measurementType != "EKG" && it.measurementType != "AI_ECG" }
         val ecgCount  = measurements.count { it.measurementType == "ECG" || it.measurementType == "EKG" }
         val aiCount   = measurements.count { it.measurementType == "AI_ECG" }
-        txt("${measurements.size}  (Puls: $pulsCount · ECG: $ecgCount · AI: $aiCount)", rx + 100f, r2, 8.5f, C_TEXT, bold = true)
+        txt("${measurements.size}  (Puls: $pulsCount · ECG: $ecgCount · Predicție: $aiCount)", rx + 100f, r2, 8.5f, C_TEXT, bold = true)
 
         // Separator orizontal ușor sub rândurile 1–2
         pStroke.color = C_BORDER; pStroke.strokeWidth = 0.35f
@@ -794,7 +800,7 @@ private fun generateMedicalPdf(
         // Tip — pastilă colorată
         val typeBg  = when { isAI -> 0xFFEDE7F6.toInt(); isEcg -> C_TEAL_TYPBG;  else -> 0xFFE3F2FD.toInt() }
         val typeTxt = when { isAI -> 0xFF4527A0.toInt(); isEcg -> C_TEAL_TYP;    else -> 0xFF0D47A1.toInt() }
-        val typeStr = when { isAI -> "AI ECG";            isEcg -> "ECG";          else -> "Puls" }
+        val typeStr = when { isAI -> "Pred. ECG";          isEcg -> "ECG";          else -> "Puls" }
         pFill.color = typeBg
         cv!!.drawRoundRect(RectF(xTip + 3f, y + 5f, xTip + 42f, y + H_ROW - 5f), 4f, 4f, pFill)
         txt(typeStr, xTip + 6f, tY, 7.5f, typeTxt, bold = true)
@@ -815,7 +821,7 @@ private fun generateMedicalPdf(
 
         // Interpretare clinică / rezultat AI — pastilă colorată
         val (interpStr, iTxt, iBg) = when {
-            isAI                -> Triple(m.aiResult ?: "Analiză AI",  0xFF4527A0.toInt(), 0xFFEDE7F6.toInt())
+            isAI                -> Triple(m.aiResult ?: "Predicție ECG", 0xFF4527A0.toInt(), 0xFFEDE7F6.toInt())
             m.averageBpm < 50   -> Triple("Bradicardie severă",        C_DKRED_TXT,        C_DKRED_BG)
             m.averageBpm < 60   -> Triple("Bradicardie",               C_ORANGE_TXT,       C_ORANGE_BG)
             m.averageBpm <= 100 -> Triple("Normal",                    C_GREEN_TXT,        C_GREEN_BG)

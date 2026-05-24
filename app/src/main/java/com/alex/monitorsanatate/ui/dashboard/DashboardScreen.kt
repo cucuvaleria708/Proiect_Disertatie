@@ -13,7 +13,6 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -39,6 +38,7 @@ import com.alex.monitorsanatate.domain.model.ConnectionState
 import com.alex.monitorsanatate.ui.components.AppScreenHeader
 import com.alex.monitorsanatate.ui.components.BpmGauge
 import com.alex.monitorsanatate.ui.components.EcgWaveform
+import com.alex.monitorsanatate.ui.ecgdetail.BEAT_CLASSES
 import com.alex.monitorsanatate.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,6 +57,8 @@ fun DashboardScreen(
     val timeRemaining      by viewModel.timeRemaining.collectAsStateWithLifecycle()
     val finalBpm           by viewModel.finalBpm.collectAsStateWithLifecycle()
     val ekgMetrics         by viewModel.ekgMetrics.collectAsStateWithLifecycle()
+    val beatPrediction     by viewModel.beatPrediction.collectAsStateWithLifecycle()
+    val isClassifying      by viewModel.isClassifying.collectAsStateWithLifecycle()
     val isConnected = connectionState is ConnectionState.Connected
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -264,7 +266,7 @@ fun DashboardScreen(
                             }
                         }
 
-                        // Buton masurare 15s
+                        // Buton masurare 20s
                         MeasurementButton(
                             state         = measurementState,
                             timeRemaining = timeRemaining,
@@ -272,6 +274,31 @@ fun DashboardScreen(
                             leadOffOk     = leadOffOk,
                             onStart       = { viewModel.startMeasurement() }
                         )
+
+                        // Predicție ECG post-măsurare
+                        if (isClassifying) {
+                            Row(
+                                modifier              = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment     = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    color       = Ral5018Main,
+                                    modifier    = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    "Se analizează bătăile ECG...",
+                                    fontSize = 13.sp,
+                                    color    = TextSecondary
+                                )
+                            }
+                        } else {
+                            beatPrediction?.let { pred ->
+                                BeatPredictionCard(pred)
+                            }
+                        }
 
                         // Card metrici ECG
                         if (ekgMetrics.rrIntervalMs > 0 || ekgMetrics.hrv > 0f) {
@@ -297,33 +324,6 @@ fun DashboardScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                             }
-                        }
-
-                        // Buton Analiza AI
-                        Button(
-                            onClick  = { viewModel.captureAndNavigateToEcgAnalysis() },
-                            enabled  = ecgPoints.size >= 50,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp),
-                            shape  = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Ral5018Main,
-                                disabledContainerColor = AppSurface
-                            )
-                        ) {
-                            Icon(
-                                imageVector        = Icons.Filled.ImageSearch,
-                                contentDescription = null,
-                                modifier           = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                "Analizează cu AI",
-                                fontWeight = FontWeight.Bold,
-                                fontSize   = 15.sp,
-                                letterSpacing = 0.5.sp
-                            )
                         }
 
                     }
@@ -460,7 +460,7 @@ private fun MeasurementButton(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (leadOffOk) "Începe Măsurare (15s)" else "Pune electrozii pe piele",
+                        if (leadOffOk) "Începe Măsurare (20s)" else "Pune electrozii pe piele",
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         letterSpacing = 0.5.sp
@@ -645,6 +645,117 @@ private fun bpmZoneColor(bpm: Int) = when {
     bpm < 60   -> TextSecondary
     bpm <= 100 -> Ral5018Light
     else       -> Ral5018Main
+}
+
+// ── Card predicție bătăi ECG (1D CNN, MIT-BIH 5 clase) ───────────────────────
+
+@Composable
+private fun BeatPredictionCard(prediction: BeatPrediction) {
+    val cls      = BEAT_CLASSES.getOrNull(prediction.dominantClass)
+    val clsColor = cls?.let { Color(it.colorLong) } ?: TextSecondary
+    val conf     = prediction.classProbs.getOrElse(prediction.dominantClass) { 0f }
+
+    Card(
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(24.dp),
+        colors    = CardDefaults.cardColors(containerColor = AppSurfaceHigh),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Text(
+                    "PREDICȚIE RITM CARDIAC",
+                    fontSize      = 11.sp,
+                    color         = TextSecondary,
+                    letterSpacing = 1.5.sp,
+                    fontWeight    = FontWeight.Black
+                )
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = clsColor.copy(alpha = 0.18f)
+                ) {
+                    Text(
+                        cls?.shortCode ?: "?",
+                        fontSize   = 11.sp,
+                        color      = clsColor,
+                        fontWeight = FontWeight.Black,
+                        modifier   = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                cls?.label ?: "Necunoscut",
+                fontSize   = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color      = TextPrimary
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                "${(conf * 100).toInt()}% încredere · ${prediction.beatsAnalyzed} bătăi analizate",
+                fontSize = 12.sp,
+                color    = TextSecondary
+            )
+
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = AppSurface, thickness = 1.dp)
+            Spacer(Modifier.height(12.dp))
+
+            BEAT_CLASSES.forEachIndexed { i, bc ->
+                val prob    = prediction.classProbs.getOrElse(i) { 0f }
+                val isTop   = i == prediction.dominantClass
+                val bcColor = Color(bc.colorLong)
+
+                Row(
+                    modifier          = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        bc.shortCode,
+                        fontSize   = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = bcColor.copy(alpha = if (isTop) 1f else 0.45f),
+                        modifier   = Modifier.width(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(AppSurface)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(prob.coerceIn(0f, 1f))
+                                .background(bcColor.copy(alpha = if (isTop) 1f else 0.35f))
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "${(prob * 100).toInt()}%",
+                        fontSize   = 11.sp,
+                        fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
+                        color      = if (isTop) bcColor else TextDisabled,
+                        textAlign  = TextAlign.End,
+                        modifier   = Modifier.width(34.dp)
+                    )
+                }
+            }
+        }
+    }
 }
 
 // ── Ghid plasare electrozi ────────────────────────────────────────────────────
