@@ -60,17 +60,24 @@ class EcgAnalysisViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<AnalysisUiState>(AnalysisUiState.Idle)
     val uiState: StateFlow<AnalysisUiState> = _uiState
 
-    init {
-        // Daca DashboardScreen a capturat un traseu ECG, il incarcam si analizam automat
-        val snapshot = ecgSnapshotHolder.pendingBitmap
-        if (snapshot != null) {
-            ecgSnapshotHolder.pendingBitmap = null
-            _uiState.value = AnalysisUiState.Result(
-                predictedIndex = -1,
-                probabilities  = emptyList(),
-                bitmap         = snapshot
-            )
-        }
+    // true dacă imaginea curentă a fost generată din semnal live (nu din galerie)
+    private val _fromSensor = MutableStateFlow(false)
+    val fromSensor: StateFlow<Boolean> = _fromSensor
+
+    /**
+     * Dacă există un bitmap generat din semnal live, îl afișează fără a porni analiza.
+     * Utilizatorul vede imaginea ECG generată și apasă manual "Analizează".
+     * Trebuie apelat din Screen via LaunchedEffect (funcționează și cu ViewModel refolosit).
+     */
+    fun checkAndAnalyzePendingSnapshot() {
+        val snapshot = ecgSnapshotHolder.pendingBitmap ?: return
+        ecgSnapshotHolder.pendingBitmap = null
+        _fromSensor.value = true
+        _uiState.value = AnalysisUiState.Result(
+            predictedIndex = -1,
+            probabilities  = emptyList(),
+            bitmap         = snapshot
+        )
     }
 
     private var module: Module? = null
@@ -119,6 +126,8 @@ class EcgAnalysisViewModel @Inject constructor(
     }
 
     fun analyze(bitmap: Bitmap) {
+        val fromSensor = _fromSensor.value
+        _fromSensor.value = false
         viewModelScope.launch {
             val startTime = System.currentTimeMillis()
             _uiState.value = AnalysisUiState.Loading
@@ -128,15 +137,15 @@ class EcgAnalysisViewModel @Inject constructor(
 
                 saveMeasurementUseCase(
                     Measurement(
-                        startTime = startTime,
-                        endTime = endTime,
-                        averageBpm = 0,
-                        minBpm = 0,
-                        maxBpm = 0,
-                        measurementType = "AI_ECG",
-                        connectionMethod = ConnectionMethod.GALLERY,
-                        aiResult = ECG_CLASSES.getOrNull(result.predictedIndex)?.label,
-                        aiProbabilities = result.probabilities.joinToString(",")
+                        startTime        = startTime,
+                        endTime          = endTime,
+                        averageBpm       = 0,
+                        minBpm           = 0,
+                        maxBpm           = 0,
+                        measurementType  = "AI_ECG",
+                        connectionMethod = if (fromSensor) ConnectionMethod.BLE else ConnectionMethod.GALLERY,
+                        aiResult         = ECG_CLASSES.getOrNull(result.predictedIndex)?.label,
+                        aiProbabilities  = result.probabilities.joinToString(",")
                     )
                 )
 
@@ -170,7 +179,10 @@ class EcgAnalysisViewModel @Inject constructor(
         )
     }
 
-    fun reset() { _uiState.value = AnalysisUiState.Idle }
+    fun reset() {
+        _uiState.value = AnalysisUiState.Idle
+        _fromSensor.value = false
+    }
 
     override fun onCleared() {
         super.onCleared()

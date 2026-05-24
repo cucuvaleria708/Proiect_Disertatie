@@ -45,7 +45,14 @@ private val EcgGreen   = Color(0xFF00E676)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EcgAnalysisScreen(viewModel: EcgAnalysisViewModel = hiltViewModel()) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState    by viewModel.uiState.collectAsStateWithLifecycle()
+    val fromSensor by viewModel.fromSensor.collectAsStateWithLifecycle()
+
+    // Verifică dacă există un snapshot generat din semnal live de la EcgDetailScreen
+    // (funcționează și când ViewModel-ul este refolosit de Navigation Compose)
+    LaunchedEffect(Unit) {
+        viewModel.checkAndAnalyzePendingSnapshot()
+    }
 
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { viewModel.loadImageFromUri(it) }
@@ -79,7 +86,12 @@ fun EcgAnalysisScreen(viewModel: EcgAnalysisViewModel = hiltViewModel()) {
                     }
 
                     is AnalysisUiState.Result -> {
-                        ImagePreviewCard(bitmap = state.bitmap, compact = state.predictedIndex != -1)
+                        ImagePreviewCard(
+                            bitmap  = state.bitmap,
+                            compact = state.predictedIndex != -1,
+                            label   = if (fromSensor && state.predictedIndex == -1)
+                                "Imagine generată din semnal live" else "Imagine sursă"
+                        )
 
                         Spacer(Modifier.height(16.dp))
 
@@ -201,7 +213,7 @@ private fun UploadCard(onGallery: () -> Unit) {
 }
 
 @Composable
-private fun ImagePreviewCard(bitmap: Bitmap, compact: Boolean) {
+private fun ImagePreviewCard(bitmap: Bitmap, compact: Boolean, label: String = "Imagine sursă") {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -217,14 +229,20 @@ private fun ImagePreviewCard(bitmap: Bitmap, compact: Boolean) {
                     .background(AppSurfaceOverlay)
                     .padding(vertical = 8.dp, horizontal = 16.dp)
             ) {
-                Text("Imagine sursă", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextSecondary, letterSpacing = 1.sp)
+                Text(
+                    label.uppercase(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextSecondary,
+                    letterSpacing = 1.sp
+                )
             }
             Image(
                 bitmap = bitmap.asImageBitmap(), contentDescription = "ECG",
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (compact) 160.dp else 240.dp)
-                    .background(Color.Black),
+                    .background(Color.White),
                 contentScale = ContentScale.Fit
             )
         }

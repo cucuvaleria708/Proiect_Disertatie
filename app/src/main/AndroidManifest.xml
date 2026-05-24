@@ -25,6 +25,9 @@
     <!-- Fallback Android 12 si mai vechi -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- Export CSV in Downloads pe Android 9 si mai vechi (API 29+ foloseste MediaStore) -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <uses-feature
         android:name="android.hardware.bluetooth_le"

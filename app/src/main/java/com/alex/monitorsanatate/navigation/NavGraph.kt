@@ -265,7 +265,9 @@ fun NavGraph(
             }
 
             composable(Screen.EcgDetail.route) {
-                EcgDetailScreen(onNavigateBack = { navController.popBackStack() })
+                EcgDetailScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
 
             composable(

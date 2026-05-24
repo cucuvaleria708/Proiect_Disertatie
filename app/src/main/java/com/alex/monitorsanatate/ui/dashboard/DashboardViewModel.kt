@@ -1,12 +1,14 @@
 package com.alex.monitorsanatate.ui.dashboard
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Path
+import android.content.ContentValues
+import android.content.Context
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alex.monitorsanatate.di.EcgSnapshotHolder
+import com.alex.monitorsanatate.ui.ecgdetail.EcgImageGenerator
 import com.alex.monitorsanatate.domain.model.ConnectionMethod
 import com.alex.monitorsanatate.domain.model.ConnectionState
 import com.alex.monitorsanatate.domain.model.Measurement
@@ -14,6 +16,7 @@ import com.alex.monitorsanatate.domain.repository.ConnectionRepository
 import com.alex.monitorsanatate.domain.repository.SensorRepository
 import com.alex.monitorsanatate.domain.usecase.SaveMeasurementUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,10 +25,17 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
+
+
+private const val LEAD_OFF_THRESHOLD_NORM = 30f / 1023f  // ecgBuffer e normalizat 0–1
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  State-ul panoului de metrici ECG
@@ -45,6 +55,7 @@ enum class MeasurementState { IDLE, MEASURING, RESULT }
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val sensorRepository: SensorRepository,
     private val connectionRepository: ConnectionRepository,
     private val saveMeasurementUseCase: SaveMeasurementUseCase,
@@ -80,6 +91,10 @@ class DashboardViewModel @Inject constructor(
     private val _navigateToEcgAnalysis = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val navigateToEcgAnalysis: SharedFlow<Unit> = _navigateToEcgAnalysis
 
+    // ── Export CSV ────────────────────────────────────────────────────────────
+    private val _exportMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val exportMessage: SharedFlow<String> = _exportMessage
+
     private val ecgBuffer = mutableListOf<Float>()
     private val maxBufferSize = 2500
 
@@ -92,7 +107,6 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             sensorRepository.sensorData.collect { data ->
                 _currentBpm.value    = data.bpm
-                _leadOffOk.value     = data.semnalValid
                 _timeRemaining.value = data.timeRemaining
                 _finalBpm.value      = data.finalBpm
 
@@ -114,6 +128,13 @@ class DashboardViewModel @Inject constructor(
                     ecgBuffer.subList(0, ecgBuffer.size - maxBufferSize).clear()
                 }
                 _ecgPoints.value = ecgBuffer.toList()
+
+                // Detecție lead-off: range local pe ultimele 50 eșantioane normalizate
+                // Nu folosim data.semnalValid ca override — firmware-ul poate trimite true chiar fără electrozi
+                val recent = if (ecgBuffer.size >= 50) ecgBuffer.takeLast(50) else ecgBuffer
+                _leadOffOk.value = if (recent.size >= 20)
+                    (recent.max() - recent.min()) >= LEAD_OFF_THRESHOLD_NORM
+                else false
             }
         }
 
@@ -158,19 +179,24 @@ class DashboardViewModel @Inject constructor(
     // ─────────────────────────────────────────────────────────────────────────
     fun startMeasurement() {
         if (_measurementState.value == MeasurementState.MEASURING) return
+        if (!_leadOffOk.value) return  // electrozi nedetectați pe piele
         _measurementState.value = MeasurementState.IDLE  // reset vizual imediat
         _finalBpm.value = 0
         connectionRepository.sendCommand("START")
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Captureza ECG → Bitmap → navigheaza la Analiza AI
+    //  Captureza ECG → Bitmap 256×256 (format clinic 4 rânduri) → Analiza AI
     // ─────────────────────────────────────────────────────────────────────────
     fun captureAndNavigateToEcgAnalysis() {
         val points = _ecgPoints.value
         if (points.size < 50) return
         viewModelScope.launch {
-            val bmp = withContext(Dispatchers.Default) { renderEcgToBitmap(points) }
+            val bmp = withContext(Dispatchers.Default) {
+                // Buffer-ul stochează valori normalizate [0,1]; EcgImageGenerator
+                // așteaptă valori ADC brute (0–1023) pentru scalarea corectă
+                EcgImageGenerator.generate(points.map { it * 1023f })
+            }
             ecgSnapshotHolder.pendingBitmap = bmp
             _navigateToEcgAnalysis.tryEmit(Unit)
         }
@@ -264,40 +290,54 @@ class DashboardViewModel @Inject constructor(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Render ECG → Bitmap 256×256 pentru modelul AI
+    //  Export ECG → CSV în folderul Downloads
     // ─────────────────────────────────────────────────────────────────────────
-    private fun renderEcgToBitmap(points: List<Float>): Bitmap {
-        val size   = 256
-        val bmp    = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-        canvas.drawColor(android.graphics.Color.rgb(18, 18, 18))
-
-        val gridPaint = Paint().apply {
-            color = android.graphics.Color.argb(50, 200, 50, 50); strokeWidth = 0.5f
+    fun exportEcgToCsv() {
+        val snapshot = ecgBuffer.toList()
+        if (snapshot.isEmpty()) {
+            _exportMessage.tryEmit("Nu există date ECG de exportat.")
+            return
         }
-        for (i in 1..4) {
-            canvas.drawLine(i * size / 5f, 0f, i * size / 5f, size.toFloat(), gridPaint)
-            canvas.drawLine(0f, i * size / 5f, size.toFloat(), i * size / 5f, gridPaint)
-        }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val ts          = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                val displayDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                val fileName    = "ecg_$ts.csv"
 
-        val tracePaint = Paint().apply {
-            color = android.graphics.Color.rgb(0, 230, 118); strokeWidth = 2f
-            isAntiAlias = true; style = Paint.Style.STROKE
-            strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
-        }
+                // Buffer normalizat [0,1] → ADC brut 0-1023
+                val csv = buildString {
+                    appendLine("# ECG Export — MonitorSanatate")
+                    appendLine("# Data: $displayDate")
+                    appendLine("# Esantioane: ${snapshot.size}")
+                    appendLine("# Frecventa de esantionare: ~250 Hz  |  Gama ADC: 0-1023 (10-bit)")
+                    appendLine("index,timestamp_ms,adc_value")
+                    snapshot.forEachIndexed { i, v ->
+                        appendLine("$i,${i * 4},${(v * 1023f).toInt()}")
+                    }
+                }
 
-        val display   = if (points.size > 500) points.takeLast(500) else points
-        if (display.size < 2) return bmp
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val cv = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                        put(MediaStore.Downloads.MIME_TYPE,    "text/csv")
+                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    }
+                    val uri = context.contentResolver.insert(
+                        MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv
+                    ) ?: throw Exception("Nu s-a putut crea fișierul.")
+                    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(csv) }
+                        ?: throw Exception("Nu s-a putut scrie fișierul.")
+                } else {
+                    val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    dir.mkdirs()
+                    File(dir, fileName).writeText(csv)
+                }
 
-        val stepX = size.toFloat() / (display.size - 1)
-        val path  = Path()
-        display.forEachIndexed { idx, v ->
-            val x = idx * stepX
-            val y = size / 2f - (v - 0.5f) * 2f * (size * 0.45f)
-            if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                _exportMessage.emit("Salvat în Downloads: $fileName")
+            } catch (e: Exception) {
+                _exportMessage.emit("Eroare export: ${e.message}")
+            }
         }
-        canvas.drawPath(path, tracePaint)
-        return bmp
     }
 
     // ─────────────────────────────────────────────────────────────────────────

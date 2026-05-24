@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.PlayArrow
@@ -58,10 +59,18 @@ fun DashboardScreen(
     val ekgMetrics         by viewModel.ekgMetrics.collectAsStateWithLifecycle()
     val isConnected = connectionState is ConnectionState.Connected
 
-    // Navigheaza la Analiza AI cand ViewModel emite evenimentul
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Navigare la Analiza AI
     LaunchedEffect(Unit) {
         viewModel.navigateToEcgAnalysis.collect {
             onNavigateToEcgAnalysis()
+        }
+    }
+    // Mesaje export CSV
+    LaunchedEffect(Unit) {
+        viewModel.exportMessage.collect { msg ->
+            snackbarHostState.showSnackbar(msg)
         }
     }
 
@@ -212,7 +221,7 @@ fun DashboardScreen(
                                 Row(
                                     modifier              = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                                        .padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment     = Alignment.CenterVertically
                                 ) {
@@ -222,11 +231,28 @@ fun DashboardScreen(
                                         color      = TextPrimary)
                                     Row(
                                         verticalAlignment     = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
+                                        // Buton export CSV
+                                        IconButton(
+                                            onClick  = { viewModel.exportEcgToCsv() },
+                                            enabled  = ecgPoints.size >= 50,
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.Download,
+                                                contentDescription = "Exportă ECG CSV",
+                                                modifier = Modifier.size(18.dp),
+                                                tint = if (ecgPoints.size >= 50) Ral5018Main
+                                                       else MaterialTheme.colorScheme.outline
+                                            )
+                                        }
                                         LiveDot()
-                                        Text("TAP pentru detalii", fontSize = 11.sp,
-                                            color = TextSecondary, letterSpacing = 0.5.sp)
+                                        Text(
+                                            "TAP pentru detalii", fontSize = 11.sp,
+                                            color = TextSecondary, letterSpacing = 0.5.sp,
+                                            modifier = Modifier.padding(end = 8.dp)
+                                        )
                                     }
                                 }
                                 EcgWaveform(
@@ -243,6 +269,7 @@ fun DashboardScreen(
                             state         = measurementState,
                             timeRemaining = timeRemaining,
                             finalBpm      = finalBpm,
+                            leadOffOk     = leadOffOk,
                             onStart       = { viewModel.startMeasurement() }
                         )
 
@@ -304,6 +331,22 @@ fun DashboardScreen(
 
                 Spacer(Modifier.height(8.dp))
             }
+        }
+
+        // Snackbar flotant (pentru confirmarea exportului CSV)
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier  = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 12.dp, start = 16.dp, end = 16.dp)
+        ) { data ->
+            Snackbar(
+                snackbarData   = data,
+                shape          = RoundedCornerShape(12.dp),
+                containerColor = MaterialTheme.colorScheme.inverseSurface,
+                contentColor   = MaterialTheme.colorScheme.inverseOnSurface
+            )
         }
     }
 }
@@ -393,20 +436,45 @@ private fun MeasurementButton(
     state: MeasurementState,
     timeRemaining: Int,
     finalBpm: Int,
+    leadOffOk: Boolean,
     onStart: () -> Unit
 ) {
     when (state) {
         MeasurementState.IDLE -> {
-            Button(
-                onClick  = onStart,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape    = RoundedCornerShape(16.dp),
-                colors   = ButtonDefaults.buttonColors(containerColor = Ral5018Main)
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Începe Măsurare (15s)", fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp, letterSpacing = 0.5.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(
+                    onClick  = onStart,
+                    enabled  = leadOffOk,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape    = RoundedCornerShape(16.dp),
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor         = Ral5018Main,
+                        disabledContainerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                        disabledContentColor   = Color.White.copy(alpha = 0.6f)
+                    )
+                ) {
+                    Icon(
+                        if (leadOffOk) Icons.Filled.PlayArrow else Icons.Filled.Warning,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (leadOffOk) "Începe Măsurare (15s)" else "Pune electrozii pe piele",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+                if (!leadOffOk) {
+                    Text(
+                        "Electrozii nu sunt detectați pe piele. Asigurați contactul și așteptați semnalul ECG.",
+                        fontSize  = 12.sp,
+                        color     = PulseRedMain,
+                        textAlign = TextAlign.Center,
+                        modifier  = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
 
